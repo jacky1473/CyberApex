@@ -895,6 +895,218 @@ body.cyber-theme {
     color: #38bdf8;
 }
 
+/* Mode Selector (Orbit vs Walk) */
+.view-mode-selector {
+    display: inline-flex;
+    gap: 6px;
+    margin-right: 14px;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+}
+.mode-chip {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.mode-chip:hover {
+    color: #f1f5f9;
+    background: rgba(56, 189, 248, 0.12);
+}
+.mode-chip.active {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    border-color: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
+/* Walk Mode HUD */
+.walk-hud {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(11, 15, 29, 0.94);
+    border: 1px solid rgba(16, 185, 129, 0.6);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    backdrop-filter: blur(14px);
+    z-index: 25;
+    animation: fadeInDown 0.3s ease;
+}
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translate(-50%, -15px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+.walk-hud-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.walk-icon {
+    font-size: 24px;
+    animation: walkBob 0.6s infinite alternate ease-in-out;
+}
+@keyframes walkBob {
+    from { transform: translateY(0); }
+    to { transform: translateY(-3px); }
+}
+.walk-hud-badge strong {
+    display: block;
+    color: #10b981;
+    font-size: 13px;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.5px;
+}
+.walk-keys {
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: 'Fira Code', monospace;
+}
+.walk-hud-actions {
+    display: flex;
+    gap: 8px;
+}
+.walk-view-toggle, .walk-exit-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.walk-view-toggle {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+}
+.walk-view-toggle:hover {
+    background: #0284c7;
+    color: #ffffff;
+}
+.walk-exit-btn {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+}
+.walk-exit-btn:hover {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+/* Walk Proximity Card */
+.walk-proximity-card {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.96);
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
+    border-radius: 12px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    backdrop-filter: blur(14px);
+    z-index: 30;
+    animation: bounceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes bounceIn {
+    0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
+    100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+.prox-avatar {
+    font-size: 28px;
+}
+.prox-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #f8fafc;
+}
+.prox-role {
+    font-size: 11px;
+    color: #38bdf8;
+}
+.prox-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+/* On-Screen Virtual D-pad */
+.walk-dpad {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: rgba(11, 15, 29, 0.8);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 14px;
+    padding: 8px;
+    backdrop-filter: blur(8px);
+    z-index: 25;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.dpad-row {
+    display: flex;
+    gap: 4px;
+}
+.dpad-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #f1f5f9;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    transition: all 0.15s ease;
+}
+.dpad-btn:hover {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #ffffff;
+}
+.dpad-btn:active {
+    background: #38bdf8;
+    color: #0b0f1d;
+    transform: scale(0.92);
+}
+.dpad-sprint {
+    background: rgba(245, 158, 11, 0.25);
+    border-color: #f59e0b;
+    color: #fbbf24;
+}
+.dpad-sprint:active {
+    background: #f59e0b;
+    color: #0b0f1d;
+}
+
 /* 3D Agent Inspector Drawer Card */
 .agent-3d-card {
     position: absolute;

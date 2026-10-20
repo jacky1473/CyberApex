@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberApex - Hands-On Linux SysAdmin & Virtual Office Game</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2.2">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600;700;800&display=swap">
@@ -136,6 +136,10 @@
     <main class="tab-content active" id="tab-map">
         <div class="floorplan-container card">
             <div class="floorplan-toolbar">
+                <div class="view-mode-selector">
+                    <button id="btn-mode-orbit" class="mode-chip active" onclick="Office3D.setMode('orbit')">🌐 Orbit Mode</button>
+                    <button id="btn-mode-walk" class="mode-chip" onclick="Office3D.setMode('walk')">🚶‍♂️ Walk Mode (Explore Office)</button>
+                </div>
                 <div class="room-legend">
                     <span class="legend-title">3D Camera:</span>
                     <button class="room-chip" onclick="Office3D.focusRoom('all')">🌐 Whole Office</button>
@@ -175,6 +179,44 @@
                     <span>🖱️ <strong>Right Click + Drag:</strong> Pan Floor</span>
                     <span>📜 <strong>Scroll:</strong> Zoom In/Out</span>
                     <span>👆 <strong>Click on Bot:</strong> Inspect AI Agent & Workstation</span>
+                </div>
+
+                <!-- Walk Mode Top HUD Overlay -->
+                <div id="walk-hud" class="walk-hud hidden">
+                    <div class="walk-hud-badge">
+                        <span class="walk-icon">🚶‍♂️</span>
+                        <div>
+                            <strong>WALK MODE ACTIVE</strong>
+                            <span class="walk-keys">W/A/S/D or Arrows to Walk | SHIFT: Sprint | E: Interact</span>
+                        </div>
+                    </div>
+                    <div class="walk-hud-actions">
+                        <button class="walk-view-toggle" id="btn-walk-pov" onclick="Office3D.togglePerspective()">👁️ 3rd Person View</button>
+                        <button class="walk-exit-btn" onclick="Office3D.setMode('orbit')">✕ Exit Walk Mode</button>
+                    </div>
+                </div>
+
+                <!-- Proximity Interaction Banner -->
+                <div id="walk-proximity-card" class="walk-proximity-card hidden">
+                    <span class="prox-avatar" id="prox-avatar">🧑‍💻</span>
+                    <div class="prox-info">
+                        <div class="prox-name" id="prox-name">Employee Name</div>
+                        <div class="prox-role" id="prox-role">Role & Workstation</div>
+                    </div>
+                    <button class="btn btn-primary prox-btn" onclick="Office3D.interactWithCurrentBot()">
+                        💬 Talk / Open Shell [E]
+                    </button>
+                </div>
+
+                <!-- On-Screen Virtual D-Pad for Walk Mode -->
+                <div id="walk-dpad" class="walk-dpad hidden">
+                    <button class="dpad-btn dpad-up" onpointerdown="Office3D.setVirtualKey('forward', true)" onpointerup="Office3D.setVirtualKey('forward', false)" onpointerleave="Office3D.setVirtualKey('forward', false)">▲</button>
+                    <div class="dpad-row">
+                        <button class="dpad-btn dpad-left" onpointerdown="Office3D.setVirtualKey('left', true)" onpointerup="Office3D.setVirtualKey('left', false)" onpointerleave="Office3D.setVirtualKey('left', false)">◀</button>
+                        <button class="dpad-btn dpad-sprint" onpointerdown="Office3D.setVirtualKey('sprint', true)" onpointerup="Office3D.setVirtualKey('sprint', false)" onpointerleave="Office3D.setVirtualKey('sprint', false)" title="Sprint (Hold for fast walk)">⚡</button>
+                        <button class="dpad-btn dpad-right" onpointerdown="Office3D.setVirtualKey('right', true)" onpointerup="Office3D.setVirtualKey('right', false)" onpointerleave="Office3D.setVirtualKey('right', false)">▶</button>
+                    </div>
+                    <button class="dpad-btn dpad-down" onpointerdown="Office3D.setVirtualKey('backward', true)" onpointerup="Office3D.setVirtualKey('backward', false)" onpointerleave="Office3D.setVirtualKey('backward', false)">▼</button>
                 </div>
 
                 <!-- 3D Bot Inspector Drawer Card -->
@@ -729,7 +771,7 @@ Type a bash command below or click a quick check button above.
 
     <script src="/static/js/three.min.js"></script>
     <script src="/static/js/OrbitControls.js"></script>
-    <script src="/static/js/office_3d.js?v=2.2"></script>
-    <script src="/static/js/office.js?v=2.2"></script>
+    <script src="/static/js/office_3d.js?v=2.3"></script>
+    <script src="/static/js/office.js?v=2.3"></script>
 </body>
 </html>
