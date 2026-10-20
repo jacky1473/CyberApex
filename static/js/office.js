@@ -1293,11 +1293,17 @@ function renderAgentReportsView() {
 }
 
 // Initialization
-document.addEventListener('DOMContentLoaded', () => {
-    initCanvas();
+function startApp() {
     if (window.Office3D) {
         window.Office3D.init('webgl-container');
     }
+    initCanvas();
     fetchState();
     setInterval(fetchState, 2000);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startApp);
+} else {
+    startApp();
+}

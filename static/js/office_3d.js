@@ -181,6 +181,7 @@ window.Office3D = (function() {
         window.addEventListener('keyup', onKeyUp);
 
         isInitialized = true;
+        renderer.render(scene, camera);
         animate();
     }
 
@@ -200,10 +201,10 @@ window.Office3D = (function() {
     }
 
     function buildFloor() {
-        const floorGeo = new THREE.PlaneGeometry(100, 80);
+        const floorGeo = new THREE.PlaneGeometry(104, 84);
         const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x0f172a,
-            roughness: 0.65,
+            color: 0x0a0f1d,
+            roughness: 0.7,
             metalness: 0.25
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -211,9 +212,85 @@ window.Office3D = (function() {
         floor.position.y = -0.05;
         scene.add(floor);
 
-        const grid = new THREE.GridHelper(100, 40, 0x06b6d4, 0x1e293b);
+        const grid = new THREE.GridHelper(104, 52, 0x06b6d4, 0x1e293b);
         grid.position.y = 0.01;
         scene.add(grid);
+
+        // Exterior Perimeter Walls with Skyscraper Observation Windows
+        buildPerimeterWalls();
+    }
+
+    // Build Exterior Skyscraper Perimeter Walls & Panoramic Glass
+    function buildPerimeterWalls() {
+        const wallH = 3.6;
+        const dadoH = 1.0;
+        const glassH = wallH - dadoH;
+        const thick = 0.35;
+
+        const dadoMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.5, metalness: 0.6 });
+        const glassMat = new THREE.MeshStandardMaterial({
+            color: 0x0284c7,
+            transparent: true,
+            opacity: 0.22,
+            roughness: 0.1,
+            metalness: 0.8
+        });
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 });
+        const neonMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+
+        // Outer boundaries: X = -52 to 52 (W: 104), Z = -42 to 42 (D: 84)
+        const wallConfigs = [
+            { length: 104, isX: true, x: 0, z: -42 },   // North
+            { length: 104, isX: true, x: 0, z: 42 },    // South
+            { length: 84,  isX: false, x: -52, z: 0 },  // West
+            { length: 84,  isX: false, x: 52, z: 0 }    // East
+        ];
+
+        wallConfigs.forEach(cfg => {
+            const wGroup = new THREE.Group();
+            wGroup.position.set(cfg.x, 0, cfg.z);
+
+            const dW = cfg.isX ? cfg.length : thick;
+            const dD = cfg.isX ? thick : cfg.length;
+            const gW = cfg.isX ? cfg.length : thick * 0.6;
+            const gD = cfg.isX ? thick * 0.6 : cfg.length;
+
+            // Solid lower sill
+            const dadoGeo = new THREE.BoxGeometry(dW, dadoH, dD);
+            const dado = new THREE.Mesh(dadoGeo, dadoMat);
+            dado.position.y = dadoH / 2;
+            wGroup.add(dado);
+
+            // Panoramic observation glass
+            const glassGeo = new THREE.BoxGeometry(gW, glassH, gD);
+            const glass = new THREE.Mesh(glassGeo, glassMat);
+            glass.position.y = dadoH + glassH / 2;
+            wGroup.add(glass);
+
+            // Ceiling lintel beam
+            const lintelGeo = new THREE.BoxGeometry(dW, 0.22, dD);
+            const lintel = new THREE.Mesh(lintelGeo, frameMat);
+            lintel.position.y = wallH - 0.11;
+            wGroup.add(lintel);
+
+            // Neon roofline trim
+            const neonGeo = new THREE.BoxGeometry(cfg.isX ? cfg.length : 0.08, 0.04, cfg.isX ? 0.08 : cfg.length);
+            const neon = new THREE.Mesh(neonGeo, neonMat);
+            neon.position.y = wallH;
+            wGroup.add(neon);
+
+            // Exterior structural mullions every 12 units
+            const numMullions = Math.floor(cfg.length / 12);
+            for (let i = 0; i <= numMullions; i++) {
+                const offset = -cfg.length / 2 + (i * (cfg.length / numMullions));
+                const mGeo = new THREE.BoxGeometry(cfg.isX ? 0.28 : thick * 1.1, wallH, cfg.isX ? thick * 1.1 : 0.28);
+                const mullion = new THREE.Mesh(mGeo, frameMat);
+                mullion.position.set(cfg.isX ? offset : 0, wallH / 2, cfg.isX ? 0 : offset);
+                wGroup.add(mullion);
+            }
+
+            scene.add(wGroup);
+        });
     }
 
     function buildRooms() {
@@ -221,11 +298,17 @@ window.Office3D = (function() {
             const roomGroup = new THREE.Group();
             roomGroup.position.set(r.x, 0, r.z);
 
-            const tileGeo = new THREE.PlaneGeometry(r.w - 1, r.d - 1);
+            const width = r.w - 1;
+            const depth = r.d - 1;
+            const hw = width / 2;
+            const hd = depth / 2;
+
+            // 1. Room Floor Tile with Accent Glow
+            const tileGeo = new THREE.PlaneGeometry(width, depth);
             const tileMat = new THREE.MeshStandardMaterial({
-                color: 0x131d33,
-                roughness: 0.5,
-                metalness: 0.2
+                color: 0x111c30,
+                roughness: 0.55,
+                metalness: 0.25
             });
             const tile = new THREE.Mesh(tileGeo, tileMat);
             tile.rotation.x = -Math.PI / 2;
@@ -239,35 +322,14 @@ window.Office3D = (function() {
             border.position.y = 0.04;
             roomGroup.add(border);
 
-            const glassMat = new THREE.MeshStandardMaterial({
-                color: r.color,
-                transparent: true,
-                opacity: 0.28,
-                roughness: 0.3
-            });
+            // 2. Determine Entrance Orientation (Top rooms enter from South, others from North)
+            const isTopRow = (roomId === "room_mgmt" || roomId === "room_noc" || roomId === "room_admin");
+            const doorFace = isTopRow ? "south" : "north";
 
-            const wallH = 2.4;
-            const wallThick = 0.2;
+            // 3. Build Architectural Walls & Doorway
+            buildRoomWallsAndDoors(roomGroup, roomId, r, width, depth, hw, hd, doorFace);
 
-            const backWallGeo = new THREE.BoxGeometry(r.w - 1, wallH, wallThick);
-            const backWall = new THREE.Mesh(backWallGeo, glassMat);
-            backWall.position.set(0, wallH / 2, -(r.d - 1) / 2);
-            roomGroup.add(backWall);
-
-            const sideWallGeo = new THREE.BoxGeometry(wallThick, wallH, r.d - 1);
-            const leftWall = new THREE.Mesh(sideWallGeo, glassMat);
-            leftWall.position.set(-(r.w - 1) / 2, wallH / 2, 0);
-            roomGroup.add(leftWall);
-
-            const rightWall = new THREE.Mesh(sideWallGeo, glassMat);
-            rightWall.position.set((r.w - 1) / 2, wallH / 2, 0);
-            roomGroup.add(rightWall);
-
-            const titleSprite = createTextSprite(`${r.icon} ${r.name}`, r.color);
-            titleSprite.position.set(0, 5.2, -(r.d - 1) / 2);
-            titleSprite.scale.set(7.5, 2.0, 1);
-            roomGroup.add(titleSprite);
-
+            // 4. Room Interior Specialized Furnishings
             if (roomId === "room_mgmt") {
                 buildBoardroomTable(roomGroup);
             } else if (roomId === "room_noc" || roomId === "room_admin") {
@@ -281,6 +343,266 @@ window.Office3D = (function() {
 
             scene.add(roomGroup);
         }
+    }
+
+    // Build Realistic Architectural Cabin Walls, Doorway, Frame & Sliding Glass Doors
+    function buildRoomWallsAndDoors(roomGroup, roomId, r, width, depth, hw, hd, doorFace) {
+        const wallH = 2.8;
+        const dadoH = 0.95;
+        const glassH = wallH - dadoH;
+        const wallThick = 0.22;
+        const doorW = 4.4;
+        const doorH = 2.45;
+
+        // Shared Materials
+        const dadoMat = new THREE.MeshStandardMaterial({
+            color: 0x0c1322,
+            roughness: 0.55,
+            metalness: 0.4
+        });
+        const glassMat = new THREE.MeshStandardMaterial({
+            color: r.color,
+            transparent: true,
+            opacity: 0.32,
+            roughness: 0.2,
+            metalness: 0.3
+        });
+        const frameMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.3,
+            metalness: 0.75
+        });
+        const neonMat = new THREE.MeshBasicMaterial({ color: r.color });
+        const doorGlassMat = new THREE.MeshStandardMaterial({
+            color: 0x06b6d4,
+            transparent: true,
+            opacity: 0.5,
+            roughness: 0.15,
+            metalness: 0.5
+        });
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1, metalness: 0.95 });
+
+        // Helper: Full Partition Wall (Solid lower panel + upper smart glass + frame & neon trim)
+        function buildFullWall(length, isHorizontal, posX, posZ) {
+            const wGeo = new THREE.Group();
+            wGeo.position.set(posX, 0, posZ);
+
+            const dW = isHorizontal ? length : wallThick;
+            const dD = isHorizontal ? wallThick : length;
+            const gW = isHorizontal ? length : wallThick * 0.7;
+            const gD = isHorizontal ? wallThick * 0.7 : length;
+
+            // Lower solid dado panel
+            const dado = new THREE.Mesh(new THREE.BoxGeometry(dW, dadoH, dD), dadoMat);
+            dado.position.y = dadoH / 2;
+            wGeo.add(dado);
+
+            // Upper smart glass partition
+            const glass = new THREE.Mesh(new THREE.BoxGeometry(gW, glassH, gD), glassMat);
+            glass.position.y = dadoH + glassH / 2;
+            wGeo.add(glass);
+
+            // Baseboard
+            const baseGeo = new THREE.BoxGeometry(isHorizontal ? length : wallThick + 0.04, 0.12, isHorizontal ? wallThick + 0.04 : length);
+            const base = new THREE.Mesh(baseGeo, frameMat);
+            base.position.y = 0.06;
+            wGeo.add(base);
+
+            // Top Header Rail
+            const topRailGeo = new THREE.BoxGeometry(isHorizontal ? length : wallThick + 0.06, 0.14, isHorizontal ? wallThick + 0.06 : length);
+            const topRail = new THREE.Mesh(topRailGeo, frameMat);
+            topRail.position.y = wallH - 0.07;
+            wGeo.add(topRail);
+
+            // Illuminated Neon Crown Strip
+            const neonCrown = new THREE.Mesh(
+                new THREE.BoxGeometry(isHorizontal ? length : 0.06, 0.04, isHorizontal ? 0.06 : length),
+                neonMat
+            );
+            neonCrown.position.y = wallH;
+            wGeo.add(neonCrown);
+
+            // Vertical partition framing mullions (every ~4m)
+            const segments = Math.max(2, Math.floor(length / 4));
+            for (let i = 1; i < segments; i++) {
+                const off = -length / 2 + (i * (length / segments));
+                const mull = new THREE.Mesh(
+                    new THREE.BoxGeometry(isHorizontal ? 0.12 : wallThick + 0.04, wallH, isHorizontal ? wallThick + 0.04 : 0.12),
+                    frameMat
+                );
+                mull.position.set(isHorizontal ? off : 0, wallH / 2, isHorizontal ? 0 : off);
+                wGeo.add(mull);
+            }
+
+            roomGroup.add(wGeo);
+        }
+
+        // Helper: Front Wall with Central Architectural Doorway & Frame
+        function buildDoorWall(length, posZ, facing) {
+            const wGroup = new THREE.Group();
+            wGroup.position.set(0, 0, posZ);
+
+            const sideW = (length - doorW) / 2;
+            const xLeft = -(length / 2) + (sideW / 2);
+            const xRight = (length / 2) - (sideW / 2);
+
+            // Left Wall Section
+            const dLeft = new THREE.Mesh(new THREE.BoxGeometry(sideW, dadoH, wallThick), dadoMat);
+            dLeft.position.set(xLeft, dadoH / 2, 0);
+            wGroup.add(dLeft);
+
+            const gLeft = new THREE.Mesh(new THREE.BoxGeometry(sideW, glassH, wallThick * 0.7), glassMat);
+            gLeft.position.set(xLeft, dadoH + glassH / 2, 0);
+            wGroup.add(gLeft);
+
+            const railLeft = new THREE.Mesh(new THREE.BoxGeometry(sideW, 0.14, wallThick + 0.06), frameMat);
+            railLeft.position.set(xLeft, wallH - 0.07, 0);
+            wGroup.add(railLeft);
+
+            // Right Wall Section
+            const dRight = new THREE.Mesh(new THREE.BoxGeometry(sideW, dadoH, wallThick), dadoMat);
+            dRight.position.set(xRight, dadoH / 2, 0);
+            wGroup.add(dRight);
+
+            const gRight = new THREE.Mesh(new THREE.BoxGeometry(sideW, glassH, wallThick * 0.7), glassMat);
+            gRight.position.set(xRight, dadoH + glassH / 2, 0);
+            wGroup.add(gRight);
+
+            const railRight = new THREE.Mesh(new THREE.BoxGeometry(sideW, 0.14, wallThick + 0.06), frameMat);
+            railRight.position.set(xRight, wallH - 0.07, 0);
+            wGroup.add(railRight);
+
+            // Header Wall above the Door Opening
+            const headH = wallH - doorH;
+            const dHead = new THREE.Mesh(new THREE.BoxGeometry(doorW, headH, wallThick), frameMat);
+            dHead.position.set(0, doorH + headH / 2, 0);
+            wGroup.add(dHead);
+
+            // Full Neon Crown across the entire wall
+            const neonCrown = new THREE.Mesh(new THREE.BoxGeometry(length, 0.04, 0.06), neonMat);
+            neonCrown.position.set(0, wallH, 0);
+            wGroup.add(neonCrown);
+
+            // Architectural Door Frame: Left & Right Jambs
+            const jambGeo = new THREE.BoxGeometry(0.24, doorH, wallThick + 0.12);
+            const leftJamb = new THREE.Mesh(jambGeo, frameMat);
+            leftJamb.position.set(-doorW / 2, doorH / 2, 0);
+            wGroup.add(leftJamb);
+
+            const rightJamb = new THREE.Mesh(jambGeo, frameMat);
+            rightJamb.position.set(doorW / 2, doorH / 2, 0);
+            wGroup.add(rightJamb);
+
+            // Door Lintel Archway Beam
+            const lintelGeo = new THREE.BoxGeometry(doorW + 0.36, 0.22, wallThick + 0.14);
+            const lintel = new THREE.Mesh(lintelGeo, frameMat);
+            lintel.position.set(0, doorH - 0.11, 0);
+            wGroup.add(lintel);
+
+            // Illuminated Lintel Accent Strip
+            const lintelGlow = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.2, 0.04, wallThick + 0.16), neonMat);
+            lintelGlow.position.set(0, doorH - 0.01, 0);
+            wGroup.add(lintelGlow);
+
+            // Twin Sliding Glass Door Leaves (Parted open for comfortable walk-through)
+            const leafW = 1.35;
+            const leafH = doorH - 0.18;
+            const doorGeo = new THREE.BoxGeometry(leafW, leafH, 0.06);
+
+            // Left Glass Door Leaf (Retracted into pocket)
+            const leftDoor = new THREE.Mesh(doorGeo, doorGlassMat);
+            leftDoor.position.set(-doorW / 2 + 0.72, leafH / 2 + 0.04, 0.04);
+            wGroup.add(leftDoor);
+
+            // Right Glass Door Leaf (Retracted into pocket)
+            const rightDoor = new THREE.Mesh(doorGeo, doorGlassMat);
+            rightDoor.position.set(doorW / 2 - 0.72, leafH / 2 + 0.04, 0.04);
+            wGroup.add(rightDoor);
+
+            // Sleek Chrome Handles on Door Leaves
+            const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.7, 12);
+            const leftHandle = new THREE.Mesh(handleGeo, handleMat);
+            leftHandle.position.set(-doorW / 2 + 1.30, 1.25, 0.09);
+            wGroup.add(leftHandle);
+
+            const rightHandle = new THREE.Mesh(handleGeo, handleMat);
+            rightHandle.position.set(doorW / 2 - 1.30, 1.25, 0.09);
+            wGroup.add(rightHandle);
+
+            // Electronic Cyber Access Panel (RFID / Biometric Reader on door post)
+            const keypadGeo = new THREE.BoxGeometry(0.12, 0.32, 0.08);
+            const keypad = new THREE.Mesh(keypadGeo, frameMat);
+            const signDir = (facing === "south" ? 1 : -1);
+            keypad.position.set(doorW / 2 + 0.14, 1.35, signDir * (wallThick / 2 + 0.04));
+            wGroup.add(keypad);
+
+            const ledGeo = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+            const ledMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+            const led = new THREE.Mesh(ledGeo, ledMat);
+            led.position.set(doorW / 2 + 0.14, 1.45, signDir * (wallThick / 2 + 0.09));
+            wGroup.add(led);
+
+            // Doorway Floor Threshold Runner / Welcome Mat
+            const runnerGeo = new THREE.PlaneGeometry(doorW - 0.4, 1.6);
+            const runnerMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const runner = new THREE.Mesh(runnerGeo, runnerMat);
+            runner.rotation.x = -Math.PI / 2;
+            runner.position.set(0, 0.03, 0);
+            wGroup.add(runner);
+
+            // Glowing Edge Strips on Runner
+            const runEdgeGeo = new THREE.BoxGeometry(doorW - 0.4, 0.02, 0.06);
+            const runEdgeNorth = new THREE.Mesh(runEdgeGeo, neonMat);
+            runEdgeNorth.position.set(0, 0.035, -0.78);
+            wGroup.add(runEdgeNorth);
+            const runEdgeSouth = new THREE.Mesh(runEdgeGeo, neonMat);
+            runEdgeSouth.position.set(0, 0.035, 0.78);
+            wGroup.add(runEdgeSouth);
+
+            // Overhead Holographic Room Entrance Sign above the Door
+            const titleSprite = createTextSprite(`${r.icon} ${r.name}`, r.color);
+            titleSprite.position.set(0, wallH + 0.85, signDir * 0.2);
+            titleSprite.scale.set(7.5, 2.0, 1);
+            wGroup.add(titleSprite);
+
+            roomGroup.add(wGroup);
+        }
+
+        // Build 3 Full Walls + 1 Doorway Wall
+        if (doorFace === "south") {
+            buildFullWall(width, true, 0, -hd);     // North (Back)
+            buildFullWall(depth, false, -hw, 0);    // West (Left)
+            buildFullWall(depth, false, hw, 0);     // East (Right)
+            buildDoorWall(width, hd, "south");      // South (Front Door)
+        } else {
+            buildDoorWall(width, -hd, "north");     // North (Front Door)
+            buildFullWall(width, true, 0, hd);      // South (Back)
+            buildFullWall(depth, false, -hw, 0);    // West (Left)
+            buildFullWall(depth, false, hw, 0);     // East (Right)
+        }
+
+        // 4 Corner Structural Beveled Columns
+        const colGeo = new THREE.BoxGeometry(0.48, wallH + 0.15, 0.48);
+        const colMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.3, metalness: 0.85 });
+        const corners = [
+            [-hw, -hd],
+            [hw, -hd],
+            [-hw, hd],
+            [hw, hd]
+        ];
+        corners.forEach(([cx, cz]) => {
+            const col = new THREE.Mesh(colGeo, colMat);
+            col.position.set(cx, (wallH + 0.15) / 2, cz);
+            roomGroup.add(col);
+
+            const colNeon = new THREE.Mesh(new THREE.BoxGeometry(0.04, wallH + 0.15, 0.04), neonMat);
+            colNeon.position.set(cx, (wallH + 0.15) / 2, cz);
+            roomGroup.add(colNeon);
+        });
     }
 
     function buildBoardroomTable(group) {
@@ -696,7 +1018,7 @@ window.Office3D = (function() {
         ctx.arcTo(x + w, y, x + w, y + h, r);
         ctx.arcTo(x + w, y + h, x, y + h, r);
         ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y + x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
         ctx.closePath();
     }
 
@@ -813,6 +1135,8 @@ window.Office3D = (function() {
                 botEntry.scrFace.material.color.setHex(deptCol);
             }
         });
+
+        renderer.render(scene, camera);
     }
 
     // Camera Focus Preset
@@ -1334,6 +1658,14 @@ window.Office3D = (function() {
 
         renderer.render(scene, camera);
     }
+
+    window._officeDebug = function() {
+        if (!camera || !scene) return "No camera or scene";
+        return "SCENE: " + scene.children.length + " objects | CAM: " +
+            camera.position.x.toFixed(1) + "," + camera.position.y.toFixed(1) + "," + camera.position.z.toFixed(1) +
+            " | ASPECT: " + camera.aspect.toFixed(2) + " | MODE: " + currentMode +
+            (controls ? " | TARGET: " + controls.target.x.toFixed(1) + "," + controls.target.y.toFixed(1) + "," + controls.target.z.toFixed(1) : "");
+    };
 
     return {
         init: init,
