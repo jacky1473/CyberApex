@@ -1171,6 +1171,18 @@ window.show3DAgentCard = function(emp) {
     document.getElementById('a3d-status').textContent = (emp.status || 'active').toUpperCase();
     document.getElementById('a3d-task').textContent = emp.task || 'Awaiting assignment';
 
+    const isLanConnected = emp.lan_connected !== false;
+    const lanBadge = document.getElementById('a3d-lan-badge');
+    if (lanBadge) {
+        lanBadge.className = isLanConnected ? 'badge badge-success' : 'badge badge-danger';
+        lanBadge.textContent = isLanConnected ? '🟢 LAN: CONNECTED' : '🔴 LAN: UNPLUGGED';
+    }
+    const lanBtn = document.getElementById('btn-a3d-lan');
+    if (lanBtn) {
+        lanBtn.className = isLanConnected ? 'btn btn-danger btn-sm' : 'btn btn-success btn-sm';
+        lanBtn.textContent = isLanConnected ? '🔌 Unplug LAN Cable' : '🔌 Plug In LAN Cable';
+    }
+
     // Find if agent is working on any project task
     const tasks = (state.project_state && state.project_state.tasks) || [];
     const activeTask = tasks.find(t => t.assignee_id === emp.id && t.status === 'working');
@@ -1182,6 +1194,18 @@ window.show3DAgentCard = function(emp) {
 
     card.classList.remove('hidden');
     window._selected3DAgent = emp;
+};
+
+window.toggleLanFromCard = async function() {
+    const emp = window._selected3DAgent;
+    if (!emp) return;
+    if (window.Office3D && window.Office3D.toggleLan) {
+        await window.Office3D.toggleLan(emp.id);
+        const updatedEmp = (state.employees || []).find(e => e.id === emp.id);
+        if (updatedEmp) {
+            window.show3DAgentCard(updatedEmp);
+        }
+    }
 };
 
 window.closeAgent3DCard = function() {

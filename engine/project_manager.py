@@ -292,8 +292,9 @@ class ClientProjectManager:
 
             all_working_are_blocked = False
             emp = self.office.get(t["assignee_id"])
-            if emp and emp["status"] == "blocked":
-                continue
+            if emp:
+                if emp["status"] == "blocked" or not emp.get("lan_connected", True):
+                    continue
 
             # Progress step
             t["progress"] += random.randint(12, 22)

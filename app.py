@@ -173,6 +173,73 @@ def client_accept_delivery():
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "No project available to accept"}), 400
 
+@app.route('/api/network/toggle_lan', methods=['POST'])
+def toggle_lan():
+    data = request.json or {}
+    emp_id = data.get("emp_id")
+    target_state = data.get("connected", None)
+
+    emp = office_state.get(emp_id)
+    if not emp:
+        return jsonify({"success": False, "error": "Employee not found"}), 404
+
+    current_state = emp.get("lan_connected", True)
+    new_state = (not current_state) if target_state is None else bool(target_state)
+
+    ip = emp.get("ip")
+    emp["lan_connected"] = new_state
+
+    # Physical Linux OS IP Alias management on ens160
+    if ip and ip.startswith("192.168.18."):
+        if not new_state:
+            subprocess.run(f"sudo -n ip addr del {ip}/24 dev ens160 2>/dev/null || true", shell=True)
+            emp["status"] = "blocked"
+            emp["task"] = "⚠️ BLOCKED: LAN Cable Disconnected from Server Room Core Switch"
+            chat_engine.add_message(
+                sender_id="EMP-003",
+                sender_name="Rohan Mehta",
+                role="Network Lead",
+                dept="network",
+                avatar="🌐",
+                text=f"🔌 **LAN CABLE UNPLUGGED:** Workstation `{ip}` ({emp['name']}) link DOWN! Port disconnected from Server Room Core Switch by Admin Farman."
+            )
+        else:
+            subprocess.run(f"sudo -n ip addr add {ip}/24 dev ens160 2>/dev/null || true", shell=True)
+            emp["status"] = "working"
+            emp["task"] = "LAN Connected - 1000BASE-T link active with Core Switch"
+            chat_engine.add_message(
+                sender_id="EMP-003",
+                sender_name="Rohan Mehta",
+                role="Network Lead",
+                dept="network",
+                avatar="🌐",
+                text=f"🟢 **LAN CABLE CONNECTED:** Workstation `{ip}` ({emp['name']}) link UP (1Gbps Full Duplex)! Connected to Server Room Core Switch."
+            )
+
+    return jsonify({
+        "success": True,
+        "emp_id": emp_id,
+        "lan_connected": new_state,
+        "ip": ip,
+        "name": emp["name"],
+        "status": emp["status"]
+    })
+
+@app.route('/api/network/lan_status')
+def get_lan_status():
+    status_list = []
+    for e in office_state.get_all():
+        if e.get("ip", "").startswith("192.168.18."):
+            status_list.append({
+                "id": e["id"],
+                "name": e["name"],
+                "role": e["role"],
+                "ip": e["ip"],
+                "lan_connected": e.get("lan_connected", True),
+                "status": e.get("status", "idle")
+            })
+    return jsonify({"success": True, "stations": status_list})
+
 @app.route('/api/tickets/resolve', methods=['POST'])
 def resolve_ticket():
     data = request.json or {}

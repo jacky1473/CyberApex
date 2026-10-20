@@ -4,11 +4,14 @@
  * interactive raycasting, workstation monitors, server racks, and alarm beacons.
  * 
  * Features:
- * - Silky-Smooth 360° Orbit Mode
- * - 🚶‍♂️ REAL WALK MODE: First-person & Third-person exploration of the office floor!
- *   Walk with W/A/S/D / Arrows, roam the central lobby and hallways, walk up to bots,
- *   and press [E] to talk and open their live terminals!
- * - On-screen Virtual D-Pad for laptop/touchpad navigation.
+ * - 🌐 3D Physical LAN Infrastructure: Real-time neon Ethernet cables running from
+ *   each bot workstation across the floor conduits to the Central Core Switch & Patch Panel
+ *   in the Server Room (NOC). Animated data packets show live traffic.
+ * - 🚶‍♂️ REAL WALK MODE with Farman's 3D Avatar (1st/3rd person POV).
+ * - 🔌 Real LAN Connect & Disconnect: Farman can walk up to any bot's PC (or Server Room switch)
+ *   and press [L] or click "Unplug LAN" to cut their Ethernet link.
+ *   Disconnection unbinds the actual Linux OS IP alias on ens160, causing packet loss!
+ *   Reconnecting restores the 1Gbps link and binds the IP back on Rocky Linux!
  */
 
 window.Office3D = (function() {
@@ -35,6 +38,7 @@ window.Office3D = (function() {
     let walkPerspective = 'third'; // 'third' or 'first'
     let player = null;
     let currentNearbyBot = null;
+    let nearServerSwitch = false;
     const keys = {
         forward: false,
         backward: false,
@@ -42,6 +46,12 @@ window.Office3D = (function() {
         right: false,
         sprint: false
     };
+
+    // 3D Physical LAN Infrastructure
+    let switchRack = null;
+    let switchPorts = [];
+    const SWITCH_WORLD_POS = new THREE.Vector3(0, 1.2, -26.5);
+    let lanCablesMap = new Map();
 
     // 8 Room Definitions (3D World Coordinates)
     const ROOM_DEFS = {
@@ -262,6 +272,9 @@ window.Office3D = (function() {
                 buildBoardroomTable(roomGroup);
             } else if (roomId === "room_noc" || roomId === "room_admin") {
                 buildServerRacks(roomGroup, roomId === "room_admin" ? 0xef4444 : 0x10b981);
+                if (roomId === "room_noc") {
+                    buildCoreSwitchRack(roomGroup);
+                }
             } else if (roomId === "room_cafe") {
                 buildCafeBar(roomGroup);
             }
@@ -312,6 +325,53 @@ window.Office3D = (function() {
                 }
             }
         }
+    }
+
+    // Build Central 10G Core LAN Switch & Patch Panel in Server Room (NOC)
+    function buildCoreSwitchRack(group) {
+        const rackGroup = new THREE.Group();
+        rackGroup.position.set(0, 0, -6.5); // Inside room_noc (world z = -26.5)
+
+        const rackGeo = new THREE.BoxGeometry(4.4, 5.4, 1.8);
+        const rackMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.3, metalness: 0.8 });
+        const rack = new THREE.Mesh(rackGeo, rackMat);
+        rack.position.set(0, 2.7, 0);
+        rack.castShadow = true;
+        rackGroup.add(rack);
+
+        // Core Switch Chassis
+        const swGeo = new THREE.BoxGeometry(3.8, 0.85, 0.14);
+        const swMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+        const swMesh = new THREE.Mesh(swGeo, swMat);
+        swMesh.position.set(0, 3.2, 0.92);
+        rackGroup.add(swMesh);
+
+        // Holographic Header
+        const swTitle = createTextSprite("🌐 10G CORE SWITCH (15 RJ45 PORTS)", 0x06b6d4);
+        swTitle.position.set(0, 5.8, 0);
+        swTitle.scale.set(7.0, 1.5, 1);
+        rackGroup.add(swTitle);
+
+        // 15 RJ45 Ethernet Ports
+        for (let i = 0; i < 15; i++) {
+            const portX = -1.5 + (i % 8) * 0.42;
+            const portY = 3.38 - Math.floor(i / 8) * 0.30;
+
+            const portGeo = new THREE.BoxGeometry(0.20, 0.16, 0.08);
+            const portMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+            const portMesh = new THREE.Mesh(portGeo, portMat);
+            portMesh.position.set(portX, portY, 0.98);
+            rackGroup.add(portMesh);
+
+            switchPorts.push({
+                mesh: portMesh,
+                empId: `EMP-${String(i + 1).padStart(3, '0')}`,
+                connected: true
+            });
+        }
+
+        group.add(rackGroup);
+        switchRack = rackGroup;
     }
 
     function buildCafeBar(group) {
@@ -446,7 +506,7 @@ window.Office3D = (function() {
             rightLeg: rightLeg,
             aura: aura,
             pos: new THREE.Vector3(0, 0, 10),
-            rotY: Math.PI, // Facing into hallway
+            rotY: Math.PI,
             walkTimer: 0
         };
     }
@@ -502,6 +562,13 @@ window.Office3D = (function() {
         const kb = new THREE.Mesh(kbGeo, new THREE.MeshStandardMaterial({ color: 0x090d16 }));
         kb.position.set(0, 1.08, 0.2);
         botGroup.add(kb);
+
+        // RJ45 Port on PC Back
+        const rj45Geo = new THREE.BoxGeometry(0.12, 0.10, 0.06);
+        const rj45Mat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+        const rj45Mesh = new THREE.Mesh(rj45Geo, rj45Mat);
+        rj45Mesh.position.set(0, 1.35, -0.40);
+        botGroup.add(rj45Mesh);
 
         // Chair
         const chairSeatGeo = new THREE.BoxGeometry(1.1, 0.12, 1.1);
@@ -589,6 +656,7 @@ window.Office3D = (function() {
             alarmLight: alarmLight,
             nameSprite: nameSprite,
             scrFace: scrFace,
+            rj45Mesh: rj45Mesh,
             data: emp,
             animPhase: Math.random() * Math.PI * 2
         };
@@ -628,7 +696,7 @@ window.Office3D = (function() {
         ctx.arcTo(x + w, y, x + w, y + h, r);
         ctx.arcTo(x + w, y + h, x, y + h, r);
         ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
+        ctx.arcTo(x, y + x, y, r);
         ctx.closePath();
     }
 
@@ -647,6 +715,72 @@ window.Office3D = (function() {
         };
     }
 
+    // 3D Physical LAN Cable Setup (From Bot Desk -> Floor Conduit -> Server Room Core Switch)
+    function createOrUpdateLanCable(emp, botPos, index) {
+        if (!emp || !emp.id.startsWith("EMP-") || emp.id === "EMP-016") return;
+
+        let cableEntry = lanCablesMap.get(emp.id);
+        const isConnected = emp.lan_connected !== false;
+
+        if (!cableEntry) {
+            const pStart = new THREE.Vector3(botPos.x, 1.05, botPos.z - 0.40);
+            const pFloor1 = new THREE.Vector3(botPos.x, 0.04, botPos.z - 0.45);
+            const pFloor2 = new THREE.Vector3(botPos.x * 0.4, 0.04, (botPos.z + SWITCH_WORLD_POS.z) * 0.45);
+            const pFloor3 = new THREE.Vector3((index % 5 - 2) * 0.7, 0.04, SWITCH_WORLD_POS.z + 2.0);
+            const pEnd = new THREE.Vector3((index % 8 - 3.5) * 0.42, 3.2, SWITCH_WORLD_POS.z + 0.95);
+
+            const curve = new THREE.CatmullRomCurve3([pStart, pFloor1, pFloor2, pFloor3, pEnd]);
+            const points = curve.getPoints(36);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+            const mat = new THREE.LineBasicMaterial({
+                color: isConnected ? 0x00f0ff : 0xef4444,
+                linewidth: 2,
+                transparent: true,
+                opacity: isConnected ? 0.85 : 0.25
+            });
+            const line = new THREE.Line(geometry, mat);
+            scene.add(line);
+
+            // Data packet pulse sphere
+            const packetGeo = new THREE.SphereGeometry(0.18, 8, 8);
+            const packetMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const packet = new THREE.Mesh(packetGeo, packetMat);
+            packet.visible = isConnected;
+            scene.add(packet);
+
+            cableEntry = {
+                line: line,
+                mat: mat,
+                curve: curve,
+                packet: packet,
+                packetProgress: Math.random(),
+                connected: isConnected,
+                emp: emp
+            };
+            lanCablesMap.set(emp.id, cableEntry);
+        } else {
+            cableEntry.connected = isConnected;
+            cableEntry.emp = emp;
+            cableEntry.mat.color.setHex(isConnected ? 0x00f0ff : 0xef4444);
+            cableEntry.mat.opacity = isConnected ? 0.85 : 0.25;
+            cableEntry.packet.visible = isConnected;
+        }
+
+        // Update Switch Port LED
+        const portItem = switchPorts.find(p => p.empId === emp.id);
+        if (portItem) {
+            portItem.connected = isConnected;
+            portItem.mesh.material.color.setHex(isConnected ? 0x10b981 : 0xff0033);
+        }
+
+        // Update Bot RJ45 Jack LED
+        const bot = botsMap.get(emp.id);
+        if (bot && bot.rj45Mesh) {
+            bot.rj45Mesh.material.color.setHex(isConnected ? 0x10b981 : 0xff0033);
+        }
+    }
+
     function update(employeesList) {
         if (!isInitialized || !employeesList) return;
 
@@ -663,10 +797,16 @@ window.Office3D = (function() {
 
             botEntry.data = emp;
 
-            const isBlocked = emp.status === "blocked";
-            botEntry.alarmGroup.visible = isBlocked;
+            // Draw/Update physical LAN cable to Server Room
+            createOrUpdateLanCable(emp, botEntry.group.position, idx);
 
-            if (isBlocked) {
+            const isBlocked = emp.status === "blocked";
+            const isLanDown = emp.lan_connected === false;
+            botEntry.alarmGroup.visible = isBlocked || isLanDown;
+
+            if (isLanDown) {
+                botEntry.scrFace.material.color.setHex(0xff0055);
+            } else if (isBlocked) {
                 botEntry.scrFace.material.color.setHex(0xff0033);
             } else {
                 const deptCol = DEPT_COLORS[emp.dept] || 0x3b82f6;
@@ -806,8 +946,82 @@ window.Office3D = (function() {
     }
 
     function interactWithCurrentBot() {
+        if (nearServerSwitch) {
+            focusRoom('room_noc');
+            return;
+        }
         if (currentNearbyBot) {
             focusBot(currentNearbyBot.id);
+        }
+    }
+
+    // Toggle LAN Connection for a bot (Physically updates cable + Linux OS IP)
+    async function toggleLan(empId) {
+        if (!empId) {
+            if (currentNearbyBot) empId = currentNearbyBot.id;
+            else return;
+        }
+
+        try {
+            const res = await fetch('/api/network/toggle_lan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ emp_id: empId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const bot = botsMap.get(empId);
+                if (bot) {
+                    bot.data.lan_connected = data.lan_connected;
+                    bot.data.status = data.status;
+                }
+                const cable = lanCablesMap.get(empId);
+                if (cable) {
+                    cable.connected = data.lan_connected;
+                    cable.mat.color.setHex(data.lan_connected ? 0x00f0ff : 0xef4444);
+                    cable.mat.opacity = data.lan_connected ? 0.85 : 0.25;
+                    cable.packet.visible = data.lan_connected;
+                }
+                const portItem = switchPorts.find(p => p.empId === empId);
+                if (portItem) {
+                    portItem.connected = data.lan_connected;
+                    portItem.mesh.material.color.setHex(data.lan_connected ? 0x10b981 : 0xff0033);
+                }
+
+                if (currentNearbyBot && currentNearbyBot.id === empId) {
+                    currentNearbyBot.lan_connected = data.lan_connected;
+                    checkBotProximity();
+                }
+
+                if (window.fetchState) window.fetchState();
+            }
+        } catch (err) {
+            console.error('Error toggling LAN:', err);
+        }
+    }
+
+    async function toggleLanForNearby() {
+        if (nearServerSwitch) {
+            // Reconnect all LAN cables in Server Room
+            try {
+                for (const [id, cable] of lanCablesMap.entries()) {
+                    if (!cable.connected) {
+                        await fetch('/api/network/toggle_lan', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ emp_id: id, connected: true })
+                        });
+                    }
+                }
+                if (window.fetchState) window.fetchState();
+            } catch (err) {
+                console.error('Error reconnecting all LAN:', err);
+            }
+            return;
+        }
+
+        if (currentNearbyBot) {
+            await toggleLan(currentNearbyBot.id);
         }
     }
 
@@ -823,6 +1037,7 @@ window.Office3D = (function() {
             else if (e.code === 'KeyD' || e.code === 'ArrowRight') { keys.right = true; e.preventDefault(); }
             else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { keys.sprint = true; }
             else if (e.code === 'KeyE') { interactWithCurrentBot(); }
+            else if (e.code === 'KeyL') { toggleLanForNearby(); }
             else if (e.code === 'KeyV') { togglePerspective(); }
             return;
         }
@@ -923,11 +1138,13 @@ window.Office3D = (function() {
             }
         }
 
-        // Check Proximity to nearest bot
+        // Check Proximity to nearest bot or Server Room Core Switch
         checkBotProximity();
     }
 
     function checkBotProximity() {
+        if (!player) return;
+
         let nearestBot = null;
         let minDist = Infinity;
 
@@ -939,24 +1156,73 @@ window.Office3D = (function() {
             }
         });
 
+        // Check distance to Central Server Room Switch (NOC Room)
+        const distToSwitch = player.pos.distanceTo(new THREE.Vector3(0, 0, -25.5));
+        nearServerSwitch = (distToSwitch < 7.0);
+
         const proxCard = document.getElementById('walk-proximity-card');
+        if (!proxCard) return;
+
+        // 1. Proximity to Central Server Room Switch
+        if (nearServerSwitch && currentMode === 'walk') {
+            currentNearbyBot = null;
+            proxCard.classList.remove('hidden');
+            document.getElementById('prox-avatar').textContent = '🌐';
+            document.getElementById('prox-name').textContent = 'Server Room: Core Switch & Patch Panel';
+            document.getElementById('prox-role').textContent = '10G Trunk Interface (ens160 Network Place)';
+            
+            const lanStatusElem = document.getElementById('prox-lan-status');
+            if (lanStatusElem) {
+                let downCount = 0;
+                lanCablesMap.forEach(c => { if (!c.connected) downCount++; });
+                lanStatusElem.innerHTML = `<span class="lan-dot ${downCount > 0 ? 'alert' : 'online'}"></span> 15 Ports Managed (${downCount > 0 ? downCount + ' Disconnected' : 'All Online'})`;
+            }
+
+            const lanBtn = document.getElementById('btn-prox-lan');
+            if (lanBtn) {
+                lanBtn.textContent = '⚡ Reconnect All LAN [L]';
+                lanBtn.className = 'btn btn-success prox-btn';
+            }
+            const talkBtn = document.getElementById('btn-prox-talk');
+            if (talkBtn) {
+                talkBtn.textContent = '📊 Focus Switch View [E]';
+            }
+            return;
+        }
+
+        // 2. Proximity to a Bot Workstation Desk
         if (minDist < 6.5 && nearestBot && currentMode === 'walk') {
             currentNearbyBot = nearestBot.data;
-            if (proxCard) {
-                proxCard.classList.remove('hidden');
-                document.getElementById('prox-avatar').textContent = nearestBot.data.avatar || '🧑‍💻';
-                document.getElementById('prox-name').textContent = nearestBot.data.name;
-                document.getElementById('prox-role').textContent = `${nearestBot.data.role} (${nearestBot.data.ip})`;
+            proxCard.classList.remove('hidden');
+            document.getElementById('prox-avatar').textContent = nearestBot.data.avatar || '🧑‍💻';
+            document.getElementById('prox-name').textContent = nearestBot.data.name;
+            document.getElementById('prox-role').textContent = `${nearestBot.data.role} (${nearestBot.data.ip})`;
+
+            const isLanConnected = nearestBot.data.lan_connected !== false;
+            const lanStatusElem = document.getElementById('prox-lan-status');
+            if (lanStatusElem) {
+                lanStatusElem.innerHTML = isLanConnected
+                    ? `<span class="lan-dot online"></span> 🟢 LAN: CONNECTED (1Gbps Full Duplex)`
+                    : `<span class="lan-dot offline"></span> 🔴 LAN: DISCONNECTED (Port Link Down)`;
             }
+
+            const lanBtn = document.getElementById('btn-prox-lan');
+            if (lanBtn) {
+                lanBtn.textContent = isLanConnected ? '🔌 Unplug LAN [L]' : '🔌 Plug In LAN [L]';
+                lanBtn.className = isLanConnected ? 'btn btn-danger prox-btn' : 'btn btn-success prox-btn';
+            }
+            const talkBtn = document.getElementById('btn-prox-talk');
+            if (talkBtn) {
+                talkBtn.textContent = '💬 Open Shell [E]';
+            }
+
             if (selectionRing) {
                 selectionRing.position.set(nearestBot.group.position.x, 0.08, nearestBot.group.position.z);
                 selectionRing.visible = true;
             }
         } else {
             currentNearbyBot = null;
-            if (proxCard) {
-                proxCard.classList.add('hidden');
-            }
+            proxCard.classList.add('hidden');
         }
     }
 
@@ -1026,32 +1292,42 @@ window.Office3D = (function() {
             controls.update();
         }
 
-        // 3. Animate 3D Bots
+        // 3. Animate LAN Cable Data Packets
+        lanCablesMap.forEach(cable => {
+            if (cable.connected && cable.packet.visible) {
+                cable.packetProgress = (cable.packetProgress + delta * 0.45) % 1.0;
+                const pos = cable.curve.getPointAt(cable.packetProgress);
+                cable.packet.position.copy(pos);
+            }
+        });
+
+        // 4. Animate 3D Bots
         botsMap.forEach(b => {
             const isBlocked = b.data.status === "blocked";
+            const isLanDown = b.data.lan_connected === false;
             const isTyping = b.data.status === "working";
 
             b.charGroup.position.y = 0.8 + Math.sin(elapsedTime * 2.5 + b.animPhase) * 0.04;
 
-            if (isTyping && !isBlocked) {
+            if (isTyping && !isBlocked && !isLanDown) {
                 b.leftArm.rotation.x = Math.PI / 4 + Math.sin(elapsedTime * 14 + b.animPhase) * 0.18;
                 b.rightArm.rotation.x = Math.PI / 4 + Math.cos(elapsedTime * 14 + b.animPhase) * 0.18;
             }
 
-            if (isBlocked && b.alarmGroup.visible) {
+            if ((isBlocked || isLanDown) && b.alarmGroup.visible) {
                 b.alarmGroup.rotation.y += delta * 6;
                 const pulse = 1.0 + Math.sin(elapsedTime * 8) * 0.5;
                 b.alarmLight.intensity = pulse * 2.5;
             }
         });
 
-        // 4. Animate Server Rack LED Blinking
+        // 5. Animate Server Rack LED Blinking
         serverLeds.forEach(led => {
             const blink = Math.sin(elapsedTime * 5 + led.phase) > 0.3;
             led.mesh.material.color.setHex(blink ? led.origColor : 0x050811);
         });
 
-        // 5. Selection Ring Rotation
+        // 6. Selection Ring Rotation
         if (selectionRing && selectionRing.visible) {
             selectionRing.rotation.z += delta * 1.5;
         }
@@ -1072,6 +1348,8 @@ window.Office3D = (function() {
         setMode: setMode,
         togglePerspective: togglePerspective,
         setVirtualKey: setVirtualKey,
-        interactWithCurrentBot: interactWithCurrentBot
+        interactWithCurrentBot: interactWithCurrentBot,
+        toggleLan: toggleLan,
+        toggleLanForNearby: toggleLanForNearby
     };
 })();

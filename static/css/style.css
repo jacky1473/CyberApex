@@ -1042,11 +1042,46 @@ body.cyber-theme {
     font-size: 11px;
     color: #38bdf8;
 }
+.prox-lan-status {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #cbd5e1;
+}
+.lan-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.lan-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+.lan-dot.offline {
+    background: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+}
+.lan-dot.alert {
+    background: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+}
+.prox-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
 .prox-btn {
     padding: 8px 16px;
     font-size: 12px;
     font-weight: 700;
     box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    cursor: pointer;
+    border-radius: 6px;
+    white-space: nowrap;
 }
 
 /* On-Screen Virtual D-pad */
@@ -1152,7 +1187,18 @@ body.cyber-theme {
 .a3d-task { background: #020617; padding: 6px 8px; border-radius: 4px; border-left: 3px solid #38bdf8; color: #f1f5f9; font-size: 11px; margin-bottom: 4px; }
 .a3d-step { font-size: 10px; font-weight: 700; }
 .a3d-rule { display: block; font-size: 10px; color: #4ade80; background: rgba(34, 197, 94, 0.1); padding: 4px 6px; border-radius: 4px; }
-.a3d-actions { margin-top: 6px; }
+.a3d-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.a3d-actions .btn {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 7px 6px;
+    white-space: nowrap;
+}
 
 /* AI Agent Rules & SOP Reports Tab */
 .rules-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }

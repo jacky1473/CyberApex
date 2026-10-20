@@ -374,6 +374,7 @@ class OfficeState:
         self.employees = [dict(c) for c in CORE_CHARACTERS]
         for e in self.employees:
             e["vdi_active"] = False
+            e["lan_connected"] = True
         self.emp_map = {e["id"]: e for e in self.employees}
         self.rooms = ROOMS
 
@@ -382,6 +383,16 @@ class OfficeState:
 
     def get(self, emp_id):
         return self.emp_map.get(emp_id)
+
+    def toggle_lan(self, emp_id, connected=None):
+        emp = self.emp_map.get(emp_id)
+        if not emp:
+            return None
+        if connected is None:
+            emp["lan_connected"] = not emp.get("lan_connected", True)
+        else:
+            emp["lan_connected"] = bool(connected)
+        return emp
 
     def set_status(self, emp_id, status, task=None, thought=None):
         emp = self.emp_map.get(emp_id)

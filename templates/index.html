@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberApex - Hands-On Linux SysAdmin & Virtual Office Game</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2.3">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600;700;800&display=swap">
@@ -187,7 +187,7 @@
                         <span class="walk-icon">🚶‍♂️</span>
                         <div>
                             <strong>WALK MODE ACTIVE</strong>
-                            <span class="walk-keys">W/A/S/D or Arrows to Walk | SHIFT: Sprint | E: Interact</span>
+                            <span class="walk-keys">W/A/S/D to Walk | SHIFT: Sprint | E: Interact | L: Plug/Unplug LAN</span>
                         </div>
                     </div>
                     <div class="walk-hud-actions">
@@ -202,10 +202,16 @@
                     <div class="prox-info">
                         <div class="prox-name" id="prox-name">Employee Name</div>
                         <div class="prox-role" id="prox-role">Role & Workstation</div>
+                        <div class="prox-lan-status" id="prox-lan-status"><span class="lan-dot online"></span> 🟢 LAN: CONNECTED</div>
                     </div>
-                    <button class="btn btn-primary prox-btn" onclick="Office3D.interactWithCurrentBot()">
-                        💬 Talk / Open Shell [E]
-                    </button>
+                    <div class="prox-actions">
+                        <button id="btn-prox-lan" class="btn btn-danger prox-btn" onclick="Office3D.toggleLanForNearby()">
+                            🔌 Unplug LAN [L]
+                        </button>
+                        <button id="btn-prox-talk" class="btn btn-primary prox-btn" onclick="Office3D.interactWithCurrentBot()">
+                            💬 Talk / Open Shell [E]
+                        </button>
+                    </div>
                 </div>
 
                 <!-- On-Screen Virtual D-Pad for Walk Mode -->
@@ -234,6 +240,7 @@
                             <span class="badge" id="a3d-dept">Backend</span>
                             <span class="badge highlight-cyan" id="a3d-ip">192.168.18.106</span>
                             <span class="badge highlight-amber" id="a3d-status">Active</span>
+                            <span class="badge badge-success" id="a3d-lan-badge">🟢 LAN: CONNECTED</span>
                         </div>
                         <div class="a3d-section">
                             <label>Workstation Hostname:</label>
@@ -249,7 +256,8 @@
                             <span class="a3d-rule">✅ Verified against RULE-01 to RULE-05</span>
                         </div>
                         <div class="a3d-actions">
-                            <button class="btn btn-primary btn-sm btn-block" onclick="launchAgentVDIFrom3D()">💻 Open Workstation Shell</button>
+                            <button id="btn-a3d-lan" class="btn btn-danger btn-sm" onclick="toggleLanFromCard()">🔌 Unplug LAN Cable</button>
+                            <button class="btn btn-primary btn-sm" onclick="launchAgentVDIFrom3D()">💻 Open Shell</button>
                         </div>
                     </div>
                 </div>
@@ -771,7 +779,7 @@ Type a bash command below or click a quick check button above.
 
     <script src="/static/js/three.min.js"></script>
     <script src="/static/js/OrbitControls.js"></script>
-    <script src="/static/js/office_3d.js?v=2.3"></script>
-    <script src="/static/js/office.js?v=2.3"></script>
+    <script src="/static/js/office_3d.js?v=2.4"></script>
+    <script src="/static/js/office.js?v=2.4"></script>
 </body>
 </html>
