@@ -195,6 +195,8 @@ def toggle_lan():
             subprocess.run(f"sudo -n ip addr del {ip}/24 dev ens160 2>/dev/null || true", shell=True)
             emp["status"] = "blocked"
             emp["task"] = "⚠️ BLOCKED: LAN Cable Disconnected from Server Room Core Switch"
+            # Trigger real incident ticket logged by the affected bot
+            incident_engine.trigger_lan_disconnect_ticket(emp_id)
             chat_engine.add_message(
                 sender_id="EMP-003",
                 sender_name="Rohan Mehta",
@@ -207,6 +209,8 @@ def toggle_lan():
             subprocess.run(f"sudo -n ip addr add {ip}/24 dev ens160 2>/dev/null || true", shell=True)
             emp["status"] = "working"
             emp["task"] = "LAN Connected - 1000BASE-T link active with Core Switch"
+            # Resolve network outage ticket and reward Farman XP
+            incident_engine.resolve_lan_disconnect_ticket(emp_id)
             chat_engine.add_message(
                 sender_id="EMP-003",
                 sender_name="Rohan Mehta",

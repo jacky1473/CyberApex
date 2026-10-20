@@ -365,6 +365,15 @@ class IncidentEngine:
                     f.write("UNIX_SOCKET_DESCRIPTOR")
                 os.chmod(sock_file, 0o000)
 
+            elif c_type == "LAN_CABLE_DISCONNECT":
+                emp = self.office.get(ticket.get("emp_id"))
+                if emp and emp.get("lan_connected", True):
+                    ip = emp.get("ip")
+                    res = subprocess.run(f"ip addr show ens160 | grep '{ip}'", shell=True, stdout=subprocess.PIPE)
+                    if res.returncode == 0:
+                        return True, f"Carrier detected! 1000BASE-T link active and IP {ip} bound on ens160."
+                return False, f"Physical cable is unplugged or IP {ticket.get('emp_ip')} is down on ens160. Plug cable back in [L]!"
+
             elif c_type == "SYSTEMD_SERVICE":
                 subprocess.run("sudo -n systemctl stop office-db 2>/dev/null || true", shell=True)
 
@@ -465,6 +474,15 @@ class IncidentEngine:
                 if mode in (0o775, 0o777, 0o664, 0o666, 0o755):
                     return True, f"Permissions verified! File mode is now {oct(mode)}."
                 return False, f"Current permission is {oct(mode)}. Needs 775 or 664 to allow application read/write."
+
+            elif c_type == "LAN_CABLE_DISCONNECT":
+                emp = self.office.get(ticket.get("emp_id"))
+                if emp and emp.get("lan_connected", True):
+                    ip = emp.get("ip")
+                    res = subprocess.run(f"ip addr show ens160 | grep '{ip}'", shell=True, stdout=subprocess.PIPE)
+                    if res.returncode == 0:
+                        return True, f"Carrier detected! 1000BASE-T link active and IP {ip} bound on ens160."
+                return False, f"Physical cable is unplugged or IP {ticket.get('emp_ip')} is down on ens160. Plug cable back in [L]!"
 
             elif c_type == "SYSTEMD_SERVICE":
                 res = subprocess.run("systemctl is-active office-db", shell=True, stdout=subprocess.PIPE)
@@ -637,6 +655,13 @@ class IncidentEngine:
                 p = "/tmp/office_sandbox/hosts_override"
                 with open(p, "a") as f:
                     f.write("192.168.18.107 internal-db.local\n")
+            elif challenge_type == "LAN_CABLE_DISCONNECT":
+                for e in self.office.get_all():
+                    if not e.get("lan_connected", True):
+                        e["lan_connected"] = True
+                        ip = e.get("ip")
+                        if ip:
+                            subprocess.run(f"sudo -n ip addr add {ip}/24 dev ens160 2>/dev/null || true", shell=True)
         except Exception as e:
             print(f"[AutoRemediate Error] {e}")
 
@@ -860,3 +885,93 @@ class IncidentEngine:
 
     def get_all_tickets(self):
         return self.tickets
+
+    def trigger_lan_disconnect_ticket(self, emp_id):
+        emp = self.office.get(emp_id)
+        if not emp:
+            return None
+        
+        # Check if already has an open LAN ticket
+        for t in self.tickets:
+            if t.get("emp_id") == emp_id and t.get("type") == "LAN_CABLE_DISCONNECT" and t.get("status") == "OPEN":
+                return t
+        
+        ticket_id = f"TICK-{self.ticket_counter}"
+        self.ticket_counter += 1
+        
+        prev_task = emp.get("task", "Awaiting assignment")
+        self.office.set_status(emp["id"], "blocked", f"⚠️ BLOCKED: LAN Cable Disconnected from Core Switch")
+        
+        ticket = {
+            "id": ticket_id,
+            "created_at": time.strftime("%H:%M:%S"),
+            "status": "OPEN",
+            "type": "LAN_CABLE_DISCONNECT",
+            "title": f"Physical LAN Cable Disconnected on Workstation {emp['ip']}",
+            "severity": "CRITICAL",
+            "emp_id": emp["id"],
+            "emp_name": emp["name"],
+            "emp_role": emp["role"],
+            "emp_ip": emp["ip"],
+            "emp_hostname": emp["hostname"],
+            "emp_dept": emp["dept"],
+            "previous_task": prev_task,
+            "workstation_path": "/etc/sysconfig/network-scripts",
+            "target_file": "ifcfg-ens160",
+            "error_log": f"[KERNEL]: eth carrier lost on interface ens160 alias {emp['ip']}\n[NETWORK]: 100% packet loss to default gateway 192.168.18.2\n[DIAGNOSTIC]: Physical RJ45 patch cord disconnected from Central 10G Core Switch rack in Server Room.",
+            "hint": f"Walk to {emp['name']}'s workstation desk (or Server Room Core Switch rack) in Walk Mode and press [L] to reconnect the LAN cable, or bind IP via terminal.",
+            "solution_cmd": f"sudo -n ip addr add {emp['ip']}/24 dev ens160",
+            "knowledge_pill": "Physical Layer (Layer 1 OSI) loss terminates all IP socket transport. Reconnecting the RJ45 cable restores PHY carrier detection and re-binds the Linux network alias.",
+            "xp_reward": 120,
+            "vdi_active": False,
+            "admin_remarks": []
+        }
+        self.tickets.insert(0, ticket)
+        
+        self.chat.add_message(
+            sender_id=emp["id"],
+            sender_name=emp["name"],
+            role=emp["role"],
+            dept=emp["dept"],
+            avatar="🔌",
+            text=f"🚨 **HELP! NETWORK OUTAGE [{ticket_id} - CRITICAL]!** Workstation `{emp['ip']}` lost Ethernet link! 100% packet loss to 192.168.18.2! Farman, did someone pull my LAN cable?!"
+        )
+        return ticket
+
+    def resolve_lan_disconnect_ticket(self, emp_id):
+        emp = self.office.get(emp_id)
+        if not emp:
+            return False
+        resolved_any = False
+        for t in self.tickets:
+            if t.get("emp_id") == emp_id and t.get("type") == "LAN_CABLE_DISCONNECT" and t.get("status") == "OPEN":
+                t["status"] = "RESOLVED"
+                t["resolved_at"] = time.strftime("%H:%M:%S")
+                t["resolution_notes"] = "Physical LAN cable re-plugged into 10G Core Switch port; carrier link UP"
+                self.resolved_count += 1
+                resolved_any = True
+                
+                # Award XP and coins
+                xp_gain = t.get("xp_reward", 120)
+                self.player_stats["xp"] += xp_gain
+                self.player_stats["coins"] += 40
+                
+                # Check level up
+                for r in RANKS:
+                    if r["min_xp"] <= self.player_stats["xp"] < r["max_xp"]:
+                        self.player_stats["level"] = r["level"]
+                        self.player_stats["rank"] = r["title"]
+                        self.player_stats["badge"] = r["badge"]
+
+                # Unblock employee
+                self.office.set_status(emp_id, "working", t.get("previous_task", "Working on tasks"))
+
+                self.chat.add_message(
+                    sender_id=emp["id"],
+                    sender_name=emp["name"],
+                    role=emp["role"],
+                    dept=emp["dept"],
+                    avatar="🎉",
+                    text=f"🟢 **NETWORK RESTORED [{t['id']}]:** Thank you Chief Admin Farman! LAN cable plugged back in. 1Gbps Full Duplex active on `{emp['ip']}`! +{xp_gain} XP awarded to Farman!"
+                )
+        return resolved_any

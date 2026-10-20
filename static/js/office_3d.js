@@ -53,6 +53,11 @@ window.Office3D = (function() {
     const SWITCH_WORLD_POS = new THREE.Vector3(0, 1.2, -26.5);
     let lanCablesMap = new Map();
 
+    // Architectural Collision & Sliding Door Systems
+    let staticObstacles = [];
+    let doorsList = [];
+    const PLAYER_COLLISION_RADIUS = 0.55;
+
     // 8 Room Definitions (3D World Coordinates)
     const ROOM_DEFS = {
         room_mgmt:    { name: "Executive Boardroom",       x: -30, z: -20, w: 26, d: 20, color: 0xf59e0b, icon: "👔" },
@@ -137,11 +142,16 @@ window.Office3D = (function() {
             });
         }
 
+        // Reset architectural collision structures
+        staticObstacles = [];
+        doorsList = [];
+
         // 5. Lighting
         setupLighting();
 
-        // 6. Floor & Environment
+        // 6. Floor, Ceiling & Cabin Architecture
         buildFloor();
+        buildCeiling();
         buildRooms();
 
         // 7. Interactive Selection Ring
@@ -216,6 +226,32 @@ window.Office3D = (function() {
         grid.position.y = 0.01;
         scene.add(grid);
 
+        // Ground Cable Raceways / Floor Conduits (routing cables into Server Room NOC)
+        const racewayMat = new THREE.MeshStandardMaterial({ color: 0x0e1726, roughness: 0.4, metalness: 0.8 });
+        const raceNeonMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+
+        // Central Spine Raceway leading straight into NOC Server Room Core Switch
+        const rSpineGeo = new THREE.BoxGeometry(1.2, 0.06, 26);
+        const rSpine = new THREE.Mesh(rSpineGeo, racewayMat);
+        rSpine.position.set(0, 0.03, -15);
+        scene.add(rSpine);
+
+        const rSpineNeonGeo = new THREE.BoxGeometry(0.06, 0.065, 26);
+        const rSpineNeon = new THREE.Mesh(rSpineNeonGeo, raceNeonMat);
+        rSpineNeon.position.set(0, 0.035, -15);
+        scene.add(rSpineNeon);
+
+        // East-West Cross Corridor Raceways
+        const rCrossGeo = new THREE.BoxGeometry(64, 0.06, 1.0);
+        const rCross = new THREE.Mesh(rCrossGeo, racewayMat);
+        rCross.position.set(0, 0.03, -7);
+        scene.add(rCross);
+
+        const rCrossNeonGeo = new THREE.BoxGeometry(64, 0.065, 0.06);
+        const rCrossNeon = new THREE.Mesh(rCrossNeonGeo, raceNeonMat);
+        rCrossNeon.position.set(0, 0.035, -7);
+        scene.add(rCrossNeon);
+
         // Exterior Perimeter Walls with Skyscraper Observation Windows
         buildPerimeterWalls();
     }
@@ -255,6 +291,27 @@ window.Office3D = (function() {
             const gW = cfg.isX ? cfg.length : thick * 0.6;
             const gD = cfg.isX ? thick * 0.6 : cfg.length;
 
+            // Register Outer Perimeter Collision Box
+            if (cfg.isX) {
+                staticObstacles.push({
+                    minX: -cfg.length / 2,
+                    maxX: cfg.length / 2,
+                    minZ: cfg.z - thick - 0.2,
+                    maxZ: cfg.z + thick + 0.2,
+                    type: 'perimeter',
+                    name: 'Outer Perimeter Wall'
+                });
+            } else {
+                staticObstacles.push({
+                    minX: cfg.x - thick - 0.2,
+                    maxX: cfg.x + thick + 0.2,
+                    minZ: -cfg.length / 2,
+                    maxZ: cfg.length / 2,
+                    type: 'perimeter',
+                    name: 'Outer Perimeter Wall'
+                });
+            }
+
             // Solid lower sill
             const dadoGeo = new THREE.BoxGeometry(dW, dadoH, dD);
             const dado = new THREE.Mesh(dadoGeo, dadoMat);
@@ -291,6 +348,103 @@ window.Office3D = (function() {
 
             scene.add(wGroup);
         });
+    }
+
+    // Build Architectural Ceiling with Rafters, Linear Lighting, HVAC Ducts, and Cable Trays
+    function buildCeiling() {
+        const ceilGroup = new THREE.Group();
+
+        // 1. Acoustic / Metallic Modular Ceiling Slab
+        // Facing DOWNWARDS towards floor (y = 3.65) with BackSide culling so Orbit top-down view is 100% unobstructed!
+        const ceilGeo = new THREE.PlaneGeometry(104, 84);
+        const ceilMat = new THREE.MeshStandardMaterial({
+            color: 0x090f1d,
+            roughness: 0.75,
+            metalness: 0.35,
+            side: THREE.BackSide
+        });
+        const ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
+        ceilMesh.rotation.x = Math.PI / 2;
+        ceilMesh.position.y = 3.65;
+        ceilGroup.add(ceilMesh);
+
+        // 2. Ceiling Structural Girders / Rafters (visible in Walk mode overhead)
+        const girderMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
+        
+        // Main Corridor Girders (X-axis across the main hallway at z = -7 and z = 17.5)
+        const gMainGeo = new THREE.BoxGeometry(104, 0.25, 0.45);
+        const gMain1 = new THREE.Mesh(gMainGeo, girderMat);
+        gMain1.position.set(0, 3.52, -7);
+        ceilGroup.add(gMain1);
+
+        const gMain2 = new THREE.Mesh(gMainGeo, girderMat);
+        gMain2.position.set(0, 3.52, 17.5);
+        ceilGroup.add(gMain2);
+
+        // Cross Girders (Z-axis between room columns)
+        const gCrossGeo = new THREE.BoxGeometry(0.45, 0.25, 84);
+        [-15, 15].forEach(xPos => {
+            const gCross = new THREE.Mesh(gCrossGeo, girderMat);
+            gCross.position.set(xPos, 3.52, 0);
+            ceilGroup.add(gCross);
+        });
+
+        // 3. Recessed Linear LED Light Bars in Corridors (soft ambient cyber glow)
+        const lightBarGeo = new THREE.BoxGeometry(96, 0.08, 0.25);
+        const lightBarMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const lightBar1 = new THREE.Mesh(lightBarGeo, lightBarMat);
+        lightBar1.position.set(0, 3.58, -7);
+        ceilGroup.add(lightBar1);
+
+        const lightBar2 = new THREE.Mesh(lightBarGeo, lightBarMat);
+        lightBar2.position.set(0, 3.58, 17.5);
+        ceilGroup.add(lightBar2);
+
+        // 4. Overhead Industrial HVAC / AC Cylindrical Ducts with Silver Finish
+        const ductMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85, roughness: 0.25 });
+        const ductGeo = new THREE.CylinderGeometry(0.38, 0.38, 100, 16);
+        
+        const duct1 = new THREE.Mesh(ductGeo, ductMat);
+        duct1.rotation.z = Math.PI / 2;
+        duct1.position.set(0, 3.32, -8.2);
+        ceilGroup.add(duct1);
+
+        // Duct mounting rings
+        for (let x = -45; x <= 45; x += 15) {
+            const ringGeo = new THREE.TorusGeometry(0.42, 0.04, 8, 24);
+            const ring = new THREE.Mesh(ringGeo, girderMat);
+            ring.rotation.y = Math.PI / 2;
+            ring.position.set(x, 3.32, -8.2);
+            ceilGroup.add(ring);
+        }
+
+        // 5. Cable Ladder Tray suspended from ceiling along the NOC corridor
+        const trayMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.8 });
+        const traySideGeo = new THREE.BoxGeometry(0.04, 0.12, 40);
+        const traySide1 = new THREE.Mesh(traySideGeo, trayMat);
+        traySide1.position.set(-0.4, 3.38, -10);
+        ceilGroup.add(traySide1);
+        const traySide2 = new THREE.Mesh(traySideGeo, trayMat);
+        traySide2.position.set(0.4, 3.38, -10);
+        ceilGroup.add(traySide2);
+
+        // Ladder rungs
+        const rungGeo = new THREE.BoxGeometry(0.8, 0.03, 0.05);
+        for (let z = -28; z <= 8; z += 1.8) {
+            const rung = new THREE.Mesh(rungGeo, trayMat);
+            rung.position.set(0, 3.34, z);
+            ceilGroup.add(rung);
+        }
+
+        // Glowing Fiber Optic Bundles inside tray
+        const fiberGeo = new THREE.CylinderGeometry(0.06, 0.06, 38, 8);
+        const fiberMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+        const fiber = new THREE.Mesh(fiberGeo, fiberMat);
+        fiber.rotation.x = Math.PI / 2;
+        fiber.position.set(0.12, 3.40, -10);
+        ceilGroup.add(fiber);
+
+        scene.add(ceilGroup);
     }
 
     function buildRooms() {
@@ -387,6 +541,16 @@ window.Office3D = (function() {
             const wGeo = new THREE.Group();
             wGeo.position.set(posX, 0, posZ);
 
+            // Register full wall collision obstacle in world coordinates
+            staticObstacles.push({
+                minX: isHorizontal ? (r.x + posX - length / 2) : (r.x + posX - wallThick / 2 - 0.2),
+                maxX: isHorizontal ? (r.x + posX + length / 2) : (r.x + posX + wallThick / 2 + 0.2),
+                minZ: isHorizontal ? (r.z + posZ - wallThick / 2 - 0.2) : (r.z + posZ - length / 2),
+                maxZ: isHorizontal ? (r.z + posZ + wallThick / 2 + 0.2) : (r.z + posZ + length / 2),
+                type: 'wall',
+                name: `${r.name} Partition Wall`
+            });
+
             const dW = isHorizontal ? length : wallThick;
             const dD = isHorizontal ? wallThick : length;
             const gW = isHorizontal ? length : wallThick * 0.7;
@@ -446,6 +610,36 @@ window.Office3D = (function() {
             const xLeft = -(length / 2) + (sideW / 2);
             const xRight = (length / 2) - (sideW / 2);
 
+            // Register Left and Right Solid Wall Collision Obstacles
+            staticObstacles.push({
+                minX: r.x - length / 2,
+                maxX: r.x - doorW / 2,
+                minZ: r.z + posZ - wallThick / 2 - 0.2,
+                maxZ: r.z + posZ + wallThick / 2 + 0.2,
+                type: 'wall',
+                name: `${r.name} Door Left Wall`
+            });
+            staticObstacles.push({
+                minX: r.x + doorW / 2,
+                maxX: r.x + length / 2,
+                minZ: r.z + posZ - wallThick / 2 - 0.2,
+                maxZ: r.z + posZ + wallThick / 2 + 0.2,
+                type: 'wall',
+                name: `${r.name} Door Right Wall`
+            });
+
+            // Dynamic Door Opening Obstacle (Blocks passage when door is closed)
+            const doorObstacle = {
+                minX: r.x - doorW / 2 + 0.05,
+                maxX: r.x + doorW / 2 - 0.05,
+                minZ: r.z + posZ - wallThick / 2 - 0.15,
+                maxZ: r.z + posZ + wallThick / 2 + 0.15,
+                type: 'door',
+                doorRef: null,
+                name: `${r.name} Sliding Door`
+            };
+            staticObstacles.push(doorObstacle);
+
             // Left Wall Section
             const dLeft = new THREE.Mesh(new THREE.BoxGeometry(sideW, dadoH, wallThick), dadoMat);
             dLeft.position.set(xLeft, dadoH / 2, 0);
@@ -504,30 +698,37 @@ window.Office3D = (function() {
             lintelGlow.position.set(0, doorH - 0.01, 0);
             wGroup.add(lintelGlow);
 
-            // Twin Sliding Glass Door Leaves (Parted open for comfortable walk-through)
-            const leafW = 1.35;
-            const leafH = doorH - 0.18;
+            // Twin Automatic Sliding Glass Door Leaves (Slide open when player approaches)
+            const leafW = doorW / 2 + 0.12; // 2.32m
+            const leafH = doorH - 0.16;
             const doorGeo = new THREE.BoxGeometry(leafW, leafH, 0.06);
 
-            // Left Glass Door Leaf (Retracted into pocket)
+            // Left Glass Door Leaf
             const leftDoor = new THREE.Mesh(doorGeo, doorGlassMat);
-            leftDoor.position.set(-doorW / 2 + 0.72, leafH / 2 + 0.04, 0.04);
             wGroup.add(leftDoor);
 
-            // Right Glass Door Leaf (Retracted into pocket)
+            // Right Glass Door Leaf
             const rightDoor = new THREE.Mesh(doorGeo, doorGlassMat);
-            rightDoor.position.set(doorW / 2 - 0.72, leafH / 2 + 0.04, 0.04);
             wGroup.add(rightDoor);
 
-            // Sleek Chrome Handles on Door Leaves
-            const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.7, 12);
+            // Sleek Chrome Handles on Door Leaves (Child of doors so they slide smoothly)
+            const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.72, 12);
             const leftHandle = new THREE.Mesh(handleGeo, handleMat);
-            leftHandle.position.set(-doorW / 2 + 1.30, 1.25, 0.09);
-            wGroup.add(leftHandle);
+            leftHandle.position.set(leafW / 2 - 0.22, 0, 0.06);
+            leftDoor.add(leftHandle);
 
             const rightHandle = new THREE.Mesh(handleGeo, handleMat);
-            rightHandle.position.set(doorW / 2 - 1.30, 1.25, 0.09);
-            wGroup.add(rightHandle);
+            rightHandle.position.set(-leafW / 2 + 0.22, 0, 0.06);
+            rightDoor.add(rightHandle);
+
+            // Positions: closed = centered, open = retracted into partition wall
+            const leftClosedX = -doorW / 4;
+            const leftOpenX = -doorW / 2 - leafW / 2 + 0.12;
+            const rightClosedX = doorW / 4;
+            const rightOpenX = doorW / 2 + leafW / 2 - 0.12;
+
+            leftDoor.position.set(leftClosedX, leafH / 2 + 0.04, 0.04);
+            rightDoor.position.set(rightClosedX, leafH / 2 + 0.04, 0.04);
 
             // Electronic Cyber Access Panel (RFID / Biometric Reader on door post)
             const keypadGeo = new THREE.BoxGeometry(0.12, 0.32, 0.08);
@@ -541,6 +742,23 @@ window.Office3D = (function() {
             const led = new THREE.Mesh(ledGeo, ledMat);
             led.position.set(doorW / 2 + 0.14, 1.45, signDir * (wallThick / 2 + 0.09));
             wGroup.add(led);
+
+            const doorObj = {
+                roomId: roomId,
+                doorCenterWorld: new THREE.Vector3(r.x, 1.2, r.z + posZ),
+                leftDoor: leftDoor,
+                rightDoor: rightDoor,
+                leftClosedX: leftClosedX,
+                leftOpenX: leftOpenX,
+                rightClosedX: rightClosedX,
+                rightOpenX: rightOpenX,
+                currentOpen: 0.0,
+                targetOpen: 0.0,
+                accessLed: led,
+                doorObstacle: doorObstacle
+            };
+            doorObstacle.doorRef = doorObj;
+            doorsList.push(doorObj);
 
             // Doorway Floor Threshold Runner / Welcome Mat
             const runnerGeo = new THREE.PlaneGeometry(doorW - 0.4, 1.6);
@@ -606,6 +824,16 @@ window.Office3D = (function() {
     }
 
     function buildBoardroomTable(group) {
+        // Register Boardroom Table Obstacle in world space (room_mgmt center = -30, -20)
+        staticObstacles.push({
+            minX: -37.0,
+            maxX: -23.0,
+            minZ: -24.0,
+            maxZ: -16.0,
+            type: 'furniture',
+            name: 'Boardroom Table'
+        });
+
         const tableGeo = new THREE.CylinderGeometry(5.0, 5.0, 0.4, 24);
         tableGeo.scale(1.4, 1.0, 0.8);
         const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.4 });
@@ -623,67 +851,210 @@ window.Office3D = (function() {
     }
 
     function buildServerRacks(group, ledColor) {
-        const rackGeo = new THREE.BoxGeometry(2.4, 4.5, 1.2);
-        const rackMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.4, metalness: 0.7 });
+        // High-Fidelity 42U Server Rack Enclosures with Smoked Glass Doors & 2U Blade Servers
+        const rackGeo = new THREE.BoxGeometry(2.4, 4.6, 1.35);
+        const rackMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.35, metalness: 0.85 });
+        const glassDoorMat = new THREE.MeshStandardMaterial({
+            color: 0x0284c7,
+            transparent: true,
+            opacity: 0.28,
+            roughness: 0.1,
+            metalness: 0.9
+        });
+        const chromeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1, metalness: 0.95 });
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
+        const caddyMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.5 });
+
+        const roomX = group.position.x;
+        const roomZ = group.position.z;
 
         for (let i = -1; i <= 1; i += 2) {
-            const rack = new THREE.Mesh(rackGeo, rackMat);
-            rack.position.set(i * 9, 2.25, -6.5);
-            rack.castShadow = true;
-            group.add(rack);
+            const posX = i * 9;
+            const posZ = -6.5;
 
-            for (let row = 0; row < 5; row++) {
-                for (let col = 0; col < 3; col++) {
-                    const ledGeo = new THREE.BoxGeometry(0.12, 0.08, 0.05);
-                    const ledMat = new THREE.MeshBasicMaterial({ color: ledColor });
-                    const led = new THREE.Mesh(ledGeo, ledMat);
-                    led.position.set(
-                        i * 9 - 0.7 + col * 0.7,
-                        1.2 + row * 0.7,
-                        -6.5 + 0.61
+            // Register rack obstacle in world space
+            staticObstacles.push({
+                minX: roomX + posX - 1.35,
+                maxX: roomX + posX + 1.35,
+                minZ: roomZ + posZ - 0.8,
+                maxZ: roomZ + posZ + 0.8,
+                type: 'rack',
+                name: 'Server Rack 42U'
+            });
+
+            const rackGroup = new THREE.Group();
+            rackGroup.position.set(posX, 2.3, posZ);
+
+            // 1. Cold-Rolled Steel Frame
+            const rack = new THREE.Mesh(rackGeo, rackMat);
+            rack.castShadow = true;
+            rackGroup.add(rack);
+
+            // 2. Front Smoked Tempered Glass Door
+            const doorGeo = new THREE.BoxGeometry(2.32, 4.42, 0.04);
+            const door = new THREE.Mesh(doorGeo, glassDoorMat);
+            door.position.set(0, 0, 0.69);
+            rackGroup.add(door);
+
+            // Door Frame & Vertical Chrome Handle
+            const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 1.8, 12);
+            const handle = new THREE.Mesh(handleGeo, chromeMat);
+            handle.position.set(0.98, 0, 0.73);
+            rackGroup.add(handle);
+
+            // 3. Top Dual Exhaust Fan Assembly
+            for (let f = -1; f <= 1; f += 2) {
+                const fanRingGeo = new THREE.TorusGeometry(0.35, 0.04, 8, 20);
+                const fanRing = new THREE.Mesh(fanRingGeo, chromeMat);
+                fanRing.rotation.x = Math.PI / 2;
+                fanRing.position.set(f * 0.55, 2.31, 0);
+                rackGroup.add(fanRing);
+
+                const fanGlowGeo = new THREE.CircleGeometry(0.32, 16);
+                const fanGlowMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide });
+                const fanGlow = new THREE.Mesh(fanGlowGeo, fanGlowMat);
+                fanGlow.rotation.x = Math.PI / 2;
+                fanGlow.position.set(f * 0.55, 2.30, 0);
+                rackGroup.add(fanGlow);
+            }
+
+            // 4. 6 Stacked 2U Blade Servers Inside Rack
+            for (let b = 0; b < 6; b++) {
+                const bladeY = -1.65 + b * 0.65;
+                const bladeGeo = new THREE.BoxGeometry(2.2, 0.55, 1.15);
+                const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                blade.position.set(0, bladeY, 0.05);
+                rackGroup.add(blade);
+
+                // 4 SAS/SATA Hot-Swap Drive Caddies per blade
+                for (let c = 0; c < 4; c++) {
+                    const caddyGeo = new THREE.BoxGeometry(0.38, 0.38, 0.04);
+                    const caddy = new THREE.Mesh(caddyGeo, caddyMat);
+                    caddy.position.set(-0.75 + c * 0.45, bladeY, 0.64);
+                    rackGroup.add(caddy);
+
+                    // Power LED (Solid Green)
+                    const pwrLed = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.04, 0.04, 0.02),
+                        new THREE.MeshBasicMaterial({ color: 0x10b981 })
                     );
-                    group.add(led);
-                    serverLeds.push({ mesh: led, origColor: ledColor, phase: Math.random() * 10 });
+                    pwrLed.position.set(-0.85 + c * 0.45, bladeY + 0.12, 0.67);
+                    rackGroup.add(pwrLed);
+
+                    // SAS I/O Activity LED (Dynamic Blinking)
+                    const actLed = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.04, 0.04, 0.02),
+                        new THREE.MeshBasicMaterial({ color: ledColor })
+                    );
+                    actLed.position.set(-0.85 + c * 0.45, bladeY - 0.12, 0.67);
+                    rackGroup.add(actLed);
+
+                    serverLeds.push({ mesh: actLed, origColor: ledColor, phase: Math.random() * 10 });
                 }
             }
+
+            group.add(rackGroup);
         }
     }
 
     // Build Central 10G Core LAN Switch & Patch Panel in Server Room (NOC)
     function buildCoreSwitchRack(group) {
+        switchPorts = [];
         const rackGroup = new THREE.Group();
         rackGroup.position.set(0, 0, -6.5); // Inside room_noc (world z = -26.5)
 
-        const rackGeo = new THREE.BoxGeometry(4.4, 5.4, 1.8);
-        const rackMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.3, metalness: 0.8 });
+        const rackGeo = new THREE.BoxGeometry(4.8, 5.5, 1.85);
+        const rackMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.35, metalness: 0.85 });
         const rack = new THREE.Mesh(rackGeo, rackMat);
-        rack.position.set(0, 2.7, 0);
+        rack.position.set(0, 2.75, 0);
         rack.castShadow = true;
         rackGroup.add(rack);
 
-        // Core Switch Chassis
-        const swGeo = new THREE.BoxGeometry(3.8, 0.85, 0.14);
-        const swMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+        // Register Switch Rack Obstacle in world coordinates (room_noc center = 0, -20)
+        staticObstacles.push({
+            minX: -2.55,
+            maxX: 2.55,
+            minZ: -27.6,
+            maxZ: -25.4,
+            type: 'rack',
+            name: 'Central 10G Core Switch Rack'
+        });
+
+        // Rack Side Illuminated Vertical Rails
+        const railMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+        [-2.35, 2.35].forEach(rx => {
+            const sideRail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 5.4, 0.04), railMat);
+            sideRail.position.set(rx, 2.75, 0.94);
+            rackGroup.add(sideRail);
+        });
+
+        // 1. Level 1: 24-Port Cat6A Patch Panel (Upper Unit)
+        const ppGeo = new THREE.BoxGeometry(4.2, 0.65, 0.15);
+        const ppMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.75 });
+        const ppMesh = new THREE.Mesh(ppGeo, ppMat);
+        ppMesh.position.set(0, 4.05, 0.93);
+        rackGroup.add(ppMesh);
+
+        // 2. Level 2: Central 10G Core Switch Chassis
+        const swGeo = new THREE.BoxGeometry(4.2, 0.88, 0.20);
+        const swMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.9 });
         const swMesh = new THREE.Mesh(swGeo, swMat);
-        swMesh.position.set(0, 3.2, 0.92);
+        swMesh.position.set(0, 3.20, 0.94);
         rackGroup.add(swMesh);
 
-        // Holographic Header
-        const swTitle = createTextSprite("🌐 10G CORE SWITCH (15 RJ45 PORTS)", 0x06b6d4);
-        swTitle.position.set(0, 5.8, 0);
-        swTitle.scale.set(7.0, 1.5, 1);
-        rackGroup.add(swTitle);
+        // OLED Status Display Panel on Switch
+        const oledGeo = new THREE.PlaneGeometry(1.2, 0.32);
+        const oledMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 });
+        const oled = new THREE.Mesh(oledGeo, oledMat);
+        oled.position.set(-1.3, 3.20, 1.05);
+        rackGroup.add(oled);
 
-        // 15 RJ45 Ethernet Ports
+        // 4x SFP+ 10G/40G Fiber Optic Transceiver Cages
+        for (let s = 0; s < 4; s++) {
+            const sfpGeo = new THREE.BoxGeometry(0.20, 0.18, 0.12);
+            const sfpMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const sfp = new THREE.Mesh(sfpGeo, sfpMat);
+            sfp.position.set(1.4 + s * 0.26, 3.20, 1.02);
+            rackGroup.add(sfp);
+        }
+
+        // 15 RJ45 Ethernet Ports + Patch Cord Jumpers
+        const cordColors = [0x00f0ff, 0x10b981, 0x3b82f6, 0xf59e0b, 0x8b5cf6];
         for (let i = 0; i < 15; i++) {
-            const portX = -1.5 + (i % 8) * 0.42;
-            const portY = 3.38 - Math.floor(i / 8) * 0.30;
+            const col = i % 8;
+            const row = Math.floor(i / 8);
+            const portX = -0.55 + col * 0.38;
+            const portY = 3.34 - row * 0.28;
+            const patchY = 4.15 - row * 0.20;
 
-            const portGeo = new THREE.BoxGeometry(0.20, 0.16, 0.08);
+            // Switch RJ45 Jack
+            const portGeo = new THREE.BoxGeometry(0.18, 0.14, 0.08);
             const portMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
             const portMesh = new THREE.Mesh(portGeo, portMat);
-            portMesh.position.set(portX, portY, 0.98);
+            portMesh.position.set(portX, portY, 1.02);
             rackGroup.add(portMesh);
+
+            // Patch Panel Jack above
+            const patchJackGeo = new THREE.BoxGeometry(0.16, 0.12, 0.06);
+            const patchJackMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
+            const patchJack = new THREE.Mesh(patchJackGeo, patchJackMat);
+            patchJack.position.set(portX, patchY, 1.01);
+            rackGroup.add(patchJack);
+
+            // Curved 3D Patch Cord Jumper between patch panel and switch
+            const pCurve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(portX, portY, 1.05),
+                new THREE.Vector3(portX, (portY + patchY) / 2, 1.24),
+                new THREE.Vector3(portX, patchY, 1.04)
+            );
+            const pTubeGeo = new THREE.TubeGeometry(pCurve, 10, 0.02, 6, false);
+            const pTubeMat = new THREE.MeshStandardMaterial({
+                color: cordColors[i % cordColors.length],
+                roughness: 0.35,
+                metalness: 0.6
+            });
+            const pTube = new THREE.Mesh(pTubeGeo, pTubeMat);
+            rackGroup.add(pTube);
 
             switchPorts.push({
                 mesh: portMesh,
@@ -692,11 +1063,61 @@ window.Office3D = (function() {
             });
         }
 
+        // 3. Level 3: 2U Enterprise Next-Gen Firewall
+        const fwGeo = new THREE.BoxGeometry(4.2, 0.60, 0.15);
+        const fwMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.8 });
+        const fwMesh = new THREE.Mesh(fwGeo, fwMat);
+        fwMesh.position.set(0, 2.30, 0.93);
+        rackGroup.add(fwMesh);
+
+        const fwLed = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.02), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        fwLed.position.set(-1.8, 2.30, 1.02);
+        rackGroup.add(fwLed);
+
+        // 4. Level 4: 3U Smart UPS Battery Backup Unit
+        const upsGeo = new THREE.BoxGeometry(4.2, 0.85, 0.18);
+        const upsMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.5, metalness: 0.7 });
+        const upsMesh = new THREE.Mesh(upsGeo, upsMat);
+        upsMesh.position.set(0, 1.40, 0.93);
+        rackGroup.add(upsMesh);
+
+        // UPS 5-Segment Battery Meter
+        for (let u = 0; u < 5; u++) {
+            const barGeo = new THREE.BoxGeometry(0.08, 0.22, 0.02);
+            const barMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+            const bar = new THREE.Mesh(barGeo, barMat);
+            bar.position.set(1.1 + u * 0.12, 1.40, 1.03);
+            rackGroup.add(bar);
+        }
+
+        // 5. Flared Floor Cable Conduit Manifold at Base
+        const manifoldGeo = new THREE.BoxGeometry(1.6, 0.35, 0.8);
+        const manifoldMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85 });
+        const manifold = new THREE.Mesh(manifoldGeo, manifoldMat);
+        manifold.position.set(0, 0.18, 0.9);
+        rackGroup.add(manifold);
+
+        // Holographic Header
+        const swTitle = createTextSprite("🌐 10G CORE SWITCH & PATCH DECK", 0x06b6d4);
+        swTitle.position.set(0, 6.0, 0);
+        swTitle.scale.set(7.5, 1.6, 1);
+        rackGroup.add(swTitle);
+
         group.add(rackGroup);
         switchRack = rackGroup;
     }
 
     function buildCafeBar(group) {
+        // Register Cyber Cafe Bar Obstacle in world space (room_cafe center = -30, 6)
+        staticObstacles.push({
+            minX: -35.2,
+            maxX: -24.8,
+            minZ: -0.8,
+            maxZ: 1.8,
+            type: 'furniture',
+            name: 'Cyber Cafe Bar'
+        });
+
         const barGeo = new THREE.BoxGeometry(10, 1.4, 2.2);
         const barMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.3 });
         const bar = new THREE.Mesh(barGeo, barMat);
@@ -729,7 +1150,7 @@ window.Office3D = (function() {
     // Build Farman's Player Character (Walk Mode Avatar)
     function buildPlayerAvatar() {
         const pGroup = new THREE.Group();
-        pGroup.position.set(0, 0, 10); // Start in central lobby
+        pGroup.position.set(0, 0, -7); // Start in Grand Central Corridor facing NOC & Lobby
 
         const charGroup = new THREE.Group();
         charGroup.position.set(0, 0.8, 0);
@@ -798,10 +1219,10 @@ window.Office3D = (function() {
 
         pGroup.add(charGroup);
 
-        // Overhead Floating Name Badge
+        // Overhead Floating Name Badge (Sleek, compact design)
         const nameSprite = createTextSprite("👑 Farman (You)", 0x10b981);
-        nameSprite.position.set(0, 3.6, 0);
-        nameSprite.scale.set(6.5, 1.6, 1);
+        nameSprite.position.set(0, 2.45, 0);
+        nameSprite.scale.set(2.4, 0.6, 1);
         pGroup.add(nameSprite);
 
         // Glowing Aura Ring Under Feet
@@ -827,7 +1248,7 @@ window.Office3D = (function() {
             leftLeg: leftLeg,
             rightLeg: rightLeg,
             aura: aura,
-            pos: new THREE.Vector3(0, 0, 10),
+            pos: new THREE.Vector3(0, 0, -7),
             rotY: Math.PI,
             walkTimer: 0
         };
@@ -1052,30 +1473,45 @@ window.Office3D = (function() {
             const pEnd = new THREE.Vector3((index % 8 - 3.5) * 0.42, 3.2, SWITCH_WORLD_POS.z + 0.95);
 
             const curve = new THREE.CatmullRomCurve3([pStart, pFloor1, pFloor2, pFloor3, pEnd]);
-            const points = curve.getPoints(36);
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const tubeGeo = new THREE.TubeGeometry(curve, 44, 0.065, 8, false);
 
-            const mat = new THREE.LineBasicMaterial({
+            const mat = new THREE.MeshStandardMaterial({
                 color: isConnected ? 0x00f0ff : 0xef4444,
-                linewidth: 2,
-                transparent: true,
-                opacity: isConnected ? 0.85 : 0.25
+                roughness: 0.25,
+                metalness: 0.8,
+                emissive: isConnected ? 0x004466 : 0x550000,
+                emissiveIntensity: 0.8
             });
-            const line = new THREE.Line(geometry, mat);
-            scene.add(line);
+            const tubeMesh = new THREE.Mesh(tubeGeo, mat);
+            scene.add(tubeMesh);
+
+            // Floor drop grommet collar under workstation desk
+            const grommetGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.05, 16);
+            const grommetMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+            const grommet = new THREE.Mesh(grommetGeo, grommetMat);
+            grommet.position.set(botPos.x, 0.03, botPos.z - 0.45);
+            scene.add(grommet);
+
+            // RJ45 Boot Collar at Workstation
+            const bootGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 12);
+            const bootMat = new THREE.MeshBasicMaterial({ color: isConnected ? 0x10b981 : 0xff0033 });
+            const boot = new THREE.Mesh(bootGeo, bootMat);
+            boot.position.copy(pStart);
+            scene.add(boot);
 
             // Data packet pulse sphere
-            const packetGeo = new THREE.SphereGeometry(0.18, 8, 8);
+            const packetGeo = new THREE.SphereGeometry(0.16, 8, 8);
             const packetMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
             const packet = new THREE.Mesh(packetGeo, packetMat);
             packet.visible = isConnected;
             scene.add(packet);
 
             cableEntry = {
-                line: line,
+                mesh: tubeMesh,
                 mat: mat,
                 curve: curve,
                 packet: packet,
+                boot: boot,
                 packetProgress: Math.random(),
                 connected: isConnected,
                 emp: emp
@@ -1085,7 +1521,12 @@ window.Office3D = (function() {
             cableEntry.connected = isConnected;
             cableEntry.emp = emp;
             cableEntry.mat.color.setHex(isConnected ? 0x00f0ff : 0xef4444);
-            cableEntry.mat.opacity = isConnected ? 0.85 : 0.25;
+            if (cableEntry.mat.emissive) {
+                cableEntry.mat.emissive.setHex(isConnected ? 0x004466 : 0x550000);
+            }
+            if (cableEntry.boot) {
+                cableEntry.boot.material.color.setHex(isConnected ? 0x10b981 : 0xff0033);
+            }
             cableEntry.packet.visible = isConnected;
         }
 
@@ -1303,7 +1744,12 @@ window.Office3D = (function() {
                 if (cable) {
                     cable.connected = data.lan_connected;
                     cable.mat.color.setHex(data.lan_connected ? 0x00f0ff : 0xef4444);
-                    cable.mat.opacity = data.lan_connected ? 0.85 : 0.25;
+                    if (cable.mat.emissive) {
+                        cable.mat.emissive.setHex(data.lan_connected ? 0x004466 : 0x550000);
+                    }
+                    if (cable.boot) {
+                        cable.boot.material.color.setHex(data.lan_connected ? 0x10b981 : 0xff0033);
+                    }
                     cable.packet.visible = data.lan_connected;
                 }
                 const portItem = switchPorts.find(p => p.empId === empId);
@@ -1381,6 +1827,29 @@ window.Office3D = (function() {
         else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.sprint = false;
     }
 
+    // AABB Collision Detection for Farman's Avatar against Walls, Doors & Racks
+    function checkCollision(targetX, targetZ) {
+        const r = PLAYER_COLLISION_RADIUS;
+        for (let i = 0; i < staticObstacles.length; i++) {
+            const obs = staticObstacles[i];
+            // If obstacle is a door, allow passage when door is at least 65% open
+            if (obs.type === 'door' && obs.doorRef) {
+                if (obs.doorRef.currentOpen >= 0.65) {
+                    continue;
+                }
+            }
+            if (
+                targetX + r > obs.minX &&
+                targetX - r < obs.maxX &&
+                targetZ + r > obs.minZ &&
+                targetZ - r < obs.maxZ
+            ) {
+                return true; // Collision detected
+            }
+        }
+        return false;
+    }
+
     // Update Player Movement & Camera Follow in Walk Mode
     function updateWalkMode(delta, elapsedTime) {
         if (!player) return;
@@ -1413,8 +1882,22 @@ window.Office3D = (function() {
             isMoving = true;
         }
 
-        player.pos.x = Math.max(-44, Math.min(44, player.pos.x + moveX));
-        player.pos.z = Math.max(-34, Math.min(34, player.pos.z + moveZ));
+        // Independent Axis Wall Sliding Collision Check
+        let targetX = player.pos.x + moveX;
+        let targetZ = player.pos.z + moveZ;
+
+        // Outer boundaries clamp
+        targetX = Math.max(-50, Math.min(50, targetX));
+        targetZ = Math.max(-40, Math.min(40, targetZ));
+
+        // Test X axis movement independently
+        if (!checkCollision(targetX, player.pos.z)) {
+            player.pos.x = targetX;
+        }
+        // Test Z axis movement independently
+        if (!checkCollision(player.pos.x, targetZ)) {
+            player.pos.z = targetZ;
+        }
         player.group.position.set(player.pos.x, 0, player.pos.z);
 
         if (isMoving) {
@@ -1598,7 +2081,34 @@ window.Office3D = (function() {
         // 1. Walk Mode Animation & Movement
         updateWalkMode(delta, elapsedTime);
 
-        // 2. Smooth Camera Fly-To Transition (in Orbit Mode)
+        // 2. Automatic Sliding Doors Animation & Proximity
+        doorsList.forEach(door => {
+            let dist = Infinity;
+            if (player) {
+                dist = player.pos.distanceTo(door.doorCenterWorld);
+            }
+            // Auto-open when Farman is within 4.8 meters
+            const shouldOpen = (dist < 4.8);
+            door.targetOpen = shouldOpen ? 1.0 : 0.0;
+            door.currentOpen = THREE.MathUtils.lerp(door.currentOpen, door.targetOpen, delta * 6.0);
+
+            // Lerp left and right sliding door leaves
+            const curLeftX = THREE.MathUtils.lerp(door.leftClosedX, door.leftOpenX, door.currentOpen);
+            const curRightX = THREE.MathUtils.lerp(door.rightClosedX, door.rightOpenX, door.currentOpen);
+            door.leftDoor.position.x = curLeftX;
+            door.rightDoor.position.x = curRightX;
+
+            // Update Electronic Cyber Access Panel RFID/Biometric LED
+            if (door.accessLed) {
+                if (door.currentOpen > 0.3) {
+                    door.accessLed.material.color.setHex(0x00f0ff); // Access Granted (Cyan)
+                } else {
+                    door.accessLed.material.color.setHex(0x10b981); // Standby / Secured (Emerald)
+                }
+            }
+        });
+
+        // 3. Smooth Camera Fly-To Transition (in Orbit Mode)
         if (currentMode === 'orbit' && isTransitioning) {
             camera.position.lerp(targetCamPos, 0.08);
             if (controls) {
