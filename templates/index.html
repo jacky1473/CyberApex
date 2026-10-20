@@ -385,9 +385,12 @@
                             <strong class="verif-badge failing" id="verif-status-badge">🔴 UNRESOLVED ON ROCKY LINUX</strong>
                         </div>
                         <p class="verif-desc" id="verif-desc-text">The issue is actively present on the filesystem. Use the terminal below to apply the fix, then click "Verify Fix in OS".</p>
-                        <div class="verif-actions">
+                        <div class="verif-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
                             <button class="btn btn-success" id="btn-verify-real-fix" onclick="verifyRealOsFix()">
                                 🔍 Verify Fix in Linux OS & Claim +150 XP!
+                            </button>
+                            <button class="btn btn-warning" id="btn-quick-autofix" onclick="quickAutoFixTicket()" title="Instantly remediate filesystem state and unblock employee">
+                                ⚡ Quick Auto-Remediate
                             </button>
                         </div>
                     </div>

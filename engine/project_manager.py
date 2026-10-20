@@ -24,6 +24,12 @@ PRESET_PROJECTS = [
         "description": "Audit and harden all internal servers with Firewalld, fail2ban, SSH key policies, and isolated VLAN routing.",
         "tech_stack": ["Firewalld", "iptables", "OpenSSH", "Rocky Linux", "Syslog", "Fail2ban"],
         "est_seconds": 110
+    },
+    {
+        "title": "AI Analytics & Real-Time Telemetry Pipeline",
+        "description": "Deploy Apache Kafka stream processing cluster, Prometheus monitoring agents, and Grafana operations dashboard.",
+        "tech_stack": ["Kafka", "Prometheus", "Grafana", "Python", "Docker", "Systemd"],
+        "est_seconds": 120
     }
 ]
 
@@ -125,11 +131,13 @@ class ClientProjectManager:
         self.is_active = False
         self.eta_seconds = 0
         self.start_timestamp = 0
+        self.current_active_phase = 2
 
     def create_project_from_client(self, title, description, client_name="Farman (Client)"):
         project_id = f"PRJ-{int(time.time())}"
         self.start_timestamp = time.time()
         self.eta_seconds = 120 # ~2 minutes of active simulated development
+        self.current_active_phase = 2
 
         tasks = []
         task_id = 1
@@ -197,10 +205,10 @@ class ClientProjectManager:
             "client_name": client_name,
             "started_at": time.strftime("%H:%M:%S"),
             "status": "in_progress",
-            "current_phase": PHASES[0],
-            "current_phase_index": 0,
-            "current_custodian": "Vikram Sharma (GM) & Team Leads",
-            "current_room": "Executive Boardroom",
+            "current_phase": PHASES[1], # Start at Phase 2 (index 1)
+            "current_phase_index": 1,
+            "current_custodian": "Rohan Mehta (Network Lead) in [NOC Room]",
+            "current_room": "room_noc",
             "total_tasks": len(tasks),
             "completed_tasks": 0,
             "progress_percent": 0,
@@ -223,7 +231,7 @@ class ClientProjectManager:
             role="Client / Project Owner",
             dept="client",
             avatar="👑",
-            text=f"📢 **CLIENT ORDER SUBMITTED:** Project **{title}**.\nRequirements: {description}.\nVikram Sharma, mobilize the team and provide live delivery updates!"
+            text=f"📢 **CLIENT ORDER SUBMITTED:** Project **'{title}'**.\nRequirements: {description}.\nVikram Sharma, mobilize the team and provide live delivery updates!"
         )
 
         self.chat.add_message(
@@ -232,49 +240,63 @@ class ClientProjectManager:
             role="General Manager",
             dept="management",
             avatar="👨‍💼",
-            text=f"Understood Farman! I have accepted project **{title}**. Leads: Rohan (NOC), Rahul (Backend), Sneha (Frontend), and Arjun (DevOps) - sprint kickoff in Boardroom!"
+            text=f"Understood Farman! I have accepted project **'{title}'**. Leads: Rohan (NOC), Rahul (Backend), Sneha (Frontend), and Arjun (DevOps) - sprint kickoff in Boardroom!"
         )
 
-        # Start phase 1 / 2 tasks
+        # Start phase 2 tasks immediately
         self.activate_phase_tasks(2)
 
         return self.current_project
 
     def activate_phase_tasks(self, phase_num):
+        self.current_active_phase = phase_num
+        activated = 0
         for t in self.tasks:
             if t["phase"] == phase_num and t["status"] == "pending":
                 t["status"] = "working"
                 self.office.set_status(t["assignee_id"], "working", t["title"])
+                activated += 1
+        return activated
 
     def tick(self):
-        if not self.is_active or not self.current_project:
+        if not self.is_active or not self.current_project or self.current_project["status"] != "in_progress":
             return
 
-        # Check if any employee is currently blocked
+        # Check which employees have open blocker tickets
         open_tickets = self.incident.get_open_tickets()
+        blocked_emp_ids = {t["emp_id"] for t in open_tickets}
         is_blocked = len(open_tickets) > 0
 
         self.current_project["is_delayed"] = is_blocked
         if is_blocked:
             first_t = open_tickets[0]
-            self.current_project["delay_reason"] = f"BLOCKED: {first_t['emp_name']} awaiting Linux Admin resolution on {first_t['id']} ({first_t['title']})"
-            # Timer is paused when blocked!
-            return
+            self.current_project["delay_reason"] = f"⚠️ TICKET OPEN: {first_t['emp_name']} ({first_t['id']}: {first_t['title']}) awaiting SysAdmin resolution!"
         else:
             self.current_project["delay_reason"] = None
-            if self.eta_seconds > 5:
-                self.eta_seconds -= 2
-            self.current_project["eta_seconds"] = self.eta_seconds
 
         active_tasks = [t for t in self.tasks if t["status"] == "working"]
 
+        # If no tasks are currently working in this phase, check if we need to activate next phase
+        if not active_tasks:
+            self._evaluate_phase_transition()
+            active_tasks = [t for t in self.tasks if t["status"] == "working"]
+            if not active_tasks:
+                return
+
         # Advance active tasks with Enterprise AI Agent SOP Protocol
+        all_working_are_blocked = True
         for t in active_tasks:
+            # If this specific employee is blocked by a ticket, pause their task
+            if t["assignee_id"] in blocked_emp_ids:
+                continue
+
+            all_working_are_blocked = False
             emp = self.office.get(t["assignee_id"])
             if emp and emp["status"] == "blocked":
                 continue
 
-            t["progress"] += random.randint(15, 26)
+            # Progress step
+            t["progress"] += random.randint(12, 22)
             if t["progress"] < 30:
                 t["sop_step"] = 1
                 t["sop_step_name"] = "Spec & Rule Compliance Audit"
@@ -295,8 +317,9 @@ class ClientProjectManager:
             if t["progress"] >= 100:
                 t["progress"] = 100
                 t["status"] = "completed"
-                self.completed_tasks.append(t)
-                self.office.set_status(t["assignee_id"], "idle", "Task finished, awaiting next assignment")
+                if t not in self.completed_tasks:
+                    self.completed_tasks.append(t)
+                self.office.set_status(t["assignee_id"], "idle", "Task finished, awaiting next milestone")
 
                 # Generate Structured AI Agent Report
                 report = {
@@ -337,76 +360,145 @@ class ClientProjectManager:
                         text=f"📋 **AGENT REPORT #{report['id']} FILED:** '{t['title']}' completed!\nRules: 100% Compliant | Artifact: `{report['deliverable_artifact']}` | Reviewed by GM Vikram."
                     )
 
-        # Update Project Progress and Phases
+        # Decrement ETA countdown if not completely deadlocked
+        if not all_working_are_blocked:
+            if self.eta_seconds > 5:
+                self.eta_seconds -= 2
+            self.current_project["eta_seconds"] = self.eta_seconds
+
+        # Update Project Progress percentage
         done_cnt = len(self.completed_tasks)
         tot_cnt = len(self.tasks)
         pct = round((done_cnt / tot_cnt) * 100) if tot_cnt > 0 else 0
         self.current_project["completed_tasks"] = done_cnt
         self.current_project["progress_percent"] = pct
 
-        # Determine current phase & custodian based on progress
-        if pct < 20:
-            phase_idx = 1 # Network & Infra
-            custodian = "Rohan Mehta (Network Lead) in [NOC Room]"
-            room = "room_noc"
-            self.activate_phase_tasks(2)
-        elif pct < 50:
-            phase_idx = 2 # Backend
-            custodian = "Rahul Verma (Backend Lead) in [Backend Engineering Bay]"
-            room = "room_backend"
-            self.activate_phase_tasks(3)
-        elif pct < 75:
-            phase_idx = 3 # Frontend
-            custodian = "Sneha Gupta (Frontend Lead) in [Frontend & UI Studio]"
-            room = "room_frontend"
-            self.activate_phase_tasks(4)
-        elif pct < 95:
-            phase_idx = 4 # DevOps & QA
-            custodian = "Arjun Nair (DevOps Lead) & Ananya Sen (QA Lead)"
-            room = "room_devops"
-            self.activate_phase_tasks(5)
-        else:
-            phase_idx = 5 # Final Packaging
-            custodian = "Vikram Sharma (General Manager) in [Executive Boardroom]"
-            room = "room_mgmt"
-            self.activate_phase_tasks(6)
+        # Check phase transitions
+        self._evaluate_phase_transition()
 
+    def _evaluate_phase_transition(self):
+        """Deterministically transitions between phases when all phase tasks are completed"""
+        if not self.current_project or self.current_project["status"] != "in_progress":
+            return
+
+        # Check Phase 2 (Network)
+        p2_tasks = [t for t in self.tasks if t["phase"] == 2]
+        p2_done = all(t["status"] == "completed" for t in p2_tasks)
+
+        # Check Phase 3 (Backend)
+        p3_tasks = [t for t in self.tasks if t["phase"] == 3]
+        p3_done = all(t["status"] == "completed" for t in p3_tasks)
+
+        # Check Phase 4 (Frontend)
+        p4_tasks = [t for t in self.tasks if t["phase"] == 4]
+        p4_done = all(t["status"] == "completed" for t in p4_tasks)
+
+        # Check Phase 5 (DevOps & QA)
+        p5_tasks = [t for t in self.tasks if t["phase"] == 5]
+        p5_done = all(t["status"] == "completed" for t in p5_tasks)
+
+        # Check Phase 6 (Final Packaging)
+        p6_tasks = [t for t in self.tasks if t["phase"] == 6]
+        p6_done = all(t["status"] == "completed" for t in p6_tasks)
+
+        if not p2_done:
+            self._set_phase(1, "Rohan Mehta (Network Lead) in [NOC Room]", "room_noc")
+            self.activate_phase_tasks(2)
+        elif not p3_done:
+            if self.current_active_phase < 3:
+                self.chat.add_message(
+                    sender_id="EMP-003",
+                    sender_name="Rohan Mehta",
+                    role="Network Lead",
+                    dept="network",
+                    avatar="🌐",
+                    text="✅ **PHASE 2 COMPLETE:** Subnets, SIP routes & NFS storage verified! Handing over custodian keys to Rahul Verma in Backend Bay."
+                )
+            self._set_phase(2, "Rahul Verma (Backend Lead) in [Backend Engineering Bay]", "room_backend")
+            self.activate_phase_tasks(3)
+        elif not p4_done:
+            if self.current_active_phase < 4:
+                self.chat.add_message(
+                    sender_id="EMP-005",
+                    sender_name="Rahul Verma",
+                    role="Backend Lead",
+                    dept="backend",
+                    avatar="⚙️",
+                    text="✅ **PHASE 3 COMPLETE:** Microservices, schemas & Redis brokers operational! Handing over to Sneha Gupta in Frontend Studio."
+                )
+            self._set_phase(3, "Sneha Gupta (Frontend Lead) in [Frontend & UI Studio]", "room_frontend")
+            self.activate_phase_tasks(4)
+        elif not p5_done:
+            if self.current_active_phase < 5:
+                self.chat.add_message(
+                    sender_id="EMP-008",
+                    sender_name="Sneha Gupta",
+                    role="Frontend Lead",
+                    dept="frontend",
+                    avatar="💻",
+                    text="✅ **PHASE 4 COMPLETE:** Dashboards, WebSocket streams & client UI verified! Handing over to Arjun Nair & Ananya Sen in DevOps/QA."
+                )
+            self._set_phase(4, "Arjun Nair (DevOps Lead) & Ananya Sen (QA Lead)", "room_devops")
+            self.activate_phase_tasks(5)
+        elif not p6_done:
+            if self.current_active_phase < 6:
+                self.chat.add_message(
+                    sender_id="EMP-010",
+                    sender_name="Arjun Nair",
+                    role="DevOps Lead",
+                    dept="devops",
+                    avatar="🚀",
+                    text="✅ **PHASE 5 COMPLETE:** 500-thread stress tests passed (0 assert failures) & systemd unit files packaged! Handing over to GM Vikram Sharma."
+                )
+            self._set_phase(5, "Vikram Sharma (General Manager) in [Executive Boardroom]", "room_mgmt")
+            self.activate_phase_tasks(6)
+        else:
+            # ALL PHASES COMPLETED! 100% COMPLETE!
+            self._complete_project()
+
+    def _set_phase(self, phase_idx, custodian, room):
         self.current_project["current_phase_index"] = phase_idx
         self.current_project["current_phase"] = PHASES[phase_idx]
         self.current_project["current_custodian"] = custodian
         self.current_project["current_room"] = room
 
-        # Project Completion Handover
-        if pct >= 100 and self.current_project["status"] == "in_progress":
-            self.current_project["status"] = "completed"
-            self.current_project["eta_seconds"] = 0
-            self.is_active = False
-            
-            # Prepare Delivery Package
-            self.current_project["delivery_package"] = {
-                "delivered_at": time.strftime("%H:%M:%S"),
-                "recipient": self.current_project["client_name"],
-                "deliverables": [
-                    "Full Production Source Code & Git Repository Repository",
-                    "NFS Storage & Directory Mount Configuration on 192.168.18.20",
-                    "MariaDB Database Migration Scripts & Seed Data",
-                    "Nginx Reverse Proxy & SSL Configuration Files",
-                    "Systemd Auto-Start Service Configuration (virtual-office.service)",
-                    "Automated Test Report: 100% Passed (Stress tested with 500 concurrent threads)"
-                ],
-                "incidents_resolved_by_admin": self.incident.resolved_count,
-                "client_rating": 5
-            }
+    def _complete_project(self):
+        if self.current_project["status"] == "completed":
+            return
 
-            self.office.set_status("EMP-001", "idle", "Project delivered to Client Farman!")
-            self.chat.add_message(
-                sender_id="EMP-001",
-                sender_name="Vikram Sharma",
-                role="General Manager",
-                dept="management",
-                avatar="👨‍💼",
-                text=f"🎉 **PROJECT DELIVERED TO CLIENT FARMAN!**\nFarman, we have completed all {tot_cnt} tasks for **'{self.current_project['title']}'**! All services tested and ready for production handover. Please review and sign off in the **Client Project Portal**."
-            )
+        self.current_project["status"] = "completed"
+        self.current_project["progress_percent"] = 100
+        self.current_project["completed_tasks"] = len(self.tasks)
+        self.current_project["eta_seconds"] = 0
+        self.current_project["is_delayed"] = False
+        self.current_project["delay_reason"] = None
+        self.is_active = False
+
+        tot_cnt = len(self.tasks)
+        self.current_project["delivery_package"] = {
+            "delivered_at": time.strftime("%H:%M:%S"),
+            "recipient": self.current_project["client_name"],
+            "deliverables": [
+                f"Full Production Source Code & Enterprise Build Package ({self.current_project['title']})",
+                "NFS Storage & Directory Mount Configuration on 192.168.18.20",
+                "MariaDB / PostgreSQL Database Migration Scripts & Seed Data",
+                "Nginx Reverse Proxy, WebSocket Listeners & SSL Configuration Files",
+                "Hardened Systemd Service Units (Auto-restart on failure, umask 027)",
+                "Automated QA Regression Suite: 100% Passed (Stress tested with 500 concurrent threads)"
+            ],
+            "incidents_resolved_by_admin": self.incident.resolved_count,
+            "client_rating": 5
+        }
+
+        self.office.set_status("EMP-001", "idle", f"Project '{self.current_project['title']}' delivered to Client Farman!")
+        self.chat.add_message(
+            sender_id="EMP-001",
+            sender_name="Vikram Sharma",
+            role="General Manager",
+            dept="management",
+            avatar="👨‍💼",
+            text=f"🎉🎉 **PROJECT DELIVERED TO CLIENT FARMAN!**\nFarman, we have successfully finished all {tot_cnt} tasks across all 6 phases for **'{self.current_project['title']}'**! All enterprise tests passed. Please sign off on the deliverable package in the **Client Project Portal** to claim your 5-star contract!"
+        )
 
     def get_project_state(self):
         return {

@@ -696,6 +696,34 @@ async function verifyRealOsFix() {
     }
 }
 
+async function quickAutoFixTicket() {
+    if (!state.selected_ticket_id) {
+        alert('Please select an active ticket first!');
+        return;
+    }
+    try {
+        const res = await fetch('/api/tickets/verify_real_fix', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                ticket_id: state.selected_ticket_id,
+                admin_name: 'Farman (Chief Linux Architect)',
+                force_skip: true
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            playChime(true);
+            alert(`⚡ Quick Auto-Remediate Applied!\n${data.message}\nWorkstation environment cleaned and tasks resuming.`);
+            fetchState();
+        } else {
+            alert('Error applying quick fix: ' + data.message);
+        }
+    } catch (e) {
+        alert('Network error applying quick fix: ' + e);
+    }
+}
+
 async function triggerManualIncident() {
     const type = document.getElementById('sim-incident-type').value;
     try {
