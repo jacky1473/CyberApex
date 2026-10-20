@@ -4,12 +4,23 @@
 [![Apache](https://img.shields.io/badge/Server-Apache%20HTTPD%20%2B%20mod__wsgi-red.svg)](https://httpd.apache.org/)
 [![Three.js](https://img.shields.io/badge/Frontend-Three.js%20WebGL-black.svg)](https://threejs.org/)
 [![Platform](https://img.shields.io/badge/Platform-Rocky%20Linux%20%2F%20RHEL-green.svg)](https://rockylinux.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**CyberApex** is an interactive **3D WebGL Virtual Office RPG** and **Autonomous AI Agent Enterprise Simulator**. In this simulation, an enterprise team of 16 autonomous AI specialists (Engineering Managers, Tech Leads, Network Engineers, Full-Stack Developers, QA Leads, NOC Operators) collaborate in real-time within a virtual 3D office floor.
+**CyberApex** is an interactive **3D WebGL Virtual Office RPG** and **Autonomous AI Agent Enterprise Simulator**. In this simulation, an enterprise team of **15 autonomous AI specialists** (Engineering Managers, Tech Leads, Network Engineers, Full-Stack Developers, QA Leads, NOC Operators) collaborate in real-time within an isometric virtual 3D office floor.
 
 You take on a dual role:
 1. **Client:** Issue real engineering projects, software goals, and feature deliverables to the Management team.
 2. **Chief Linux Architect & System Administrator:** Resolve system-level failures, network drops, permission errors, and service crashes that agents encounter while building your projects.
+
+---
+
+## 📸 Live Demo & Screenshots
+
+| 🎮 3D WebGL Operations Floor | 📊 Executive Dashboard & Ticketing |
+| :---: | :---: |
+| ![3D Office Floor Preview](docs/images/office_3d_floor.png) | ![Incident Console Preview](docs/images/admin_console.png) |
+
+> *Tip: Experience real-time WebGL rendering, orbit camera controls, department zoom presets, and interactive raycasting to inspect any workstation on the floor.*
 
 ---
 
@@ -21,7 +32,7 @@ You take on a dual role:
 - **Agent Raycasting:** Click on any 3D animated agent to open their live dossier, workstation details, current tasks, and remote shell.
 
 ### 🤖 2. Autonomous Multi-Agent Hierarchy & SOP Protocol
-- **Specialized Workforce:** 16 distinct bot agents across Leadership, Infra, Network, QA, and Development.
+- **Specialized Workforce:** 15 distinct bot agents across Leadership, Infra, Network, QA, and Development.
 - **4-Step SOP Execution:** Agents follow strict Standard Operating Procedures:
   1. *Requirement & Architecture Analysis*
   2. *Development & Provisioning*
@@ -36,7 +47,7 @@ You take on a dual role:
 ### 💻 4. Live Web Terminal & On-Demand Sandbox
 - Isolated web terminal for each workstation IP (`192.168.18.101` – `192.168.18.115`).
 - Runs real Linux commands on host or sandbox environments.
-- **Resource Optimization:** Sandbox sessions dynamically spawn when troubleshooting starts and spin down when the ticket is marked resolved.
+- **Resource Optimization:** Sandbox sessions dynamically spawn when troubleshooting starts and spin down when the ticket is marked resolved to conserve host resources.
 
 ### 💬 5. Admin Remark & Verification Loop
 - When resolving an incident, the Linux Admin enters technical remarks and resolution details.
@@ -52,7 +63,7 @@ You take on a dual role:
 
 ```mermaid
 graph TD
-    User["👑 Farman (Client & Chief Linux Admin)"]
+    User["👑 User (Client & Chief Linux Admin)"]
     
     subgraph WebInterface ["🌐 CyberApex 3D Web Interface (Apache HTTPD :80)"]
         ThreeJS["🎮 3D WebGL Three.js Engine"]
@@ -70,7 +81,7 @@ graph TD
     end
 
     subgraph NetworkStack ["🔌 Linux Network & Systemd Layer"]
-        KernelNet["ens160 Interface (192.168.18.101 - 115)"]
+        KernelNet["ens160 Interface (192.168.18.101 - 192.168.18.115)"]
         NetService["virtual-office-network.service"]
     end
 
@@ -81,13 +92,29 @@ graph TD
 
 ---
 
+## 🛠️ Sample Linux Incidents & Troubleshooting Scenarios
+
+CyberApex generates realistic Linux administration challenges during agent workflows. Below are typical enterprise failure scenarios and the recommended Linux troubleshooting toolchains:
+
+| Scenario / Incident | Root Cause Description | Affected Area | Target Linux Diagnostic & Remediation Tools |
+| :--- | :--- | :--- | :--- |
+| **Disk & Inode Exhaustion** | Unchecked build artifacts or rogue logs consuming root filesystem inodes or disk space. | Storage / Root FS | `df -h`, `df -i`, `du -sh /var/log/*`, `find / -type f -size +100M -exec ls -lh {} +` |
+| **SELinux Context & Port Lock** | Apache or WSGI blocked from binding sockets or reading application templates due to invalid context. | Security / SELinux | `journalctl -xe`, `audit2why -a`, `restorecon -Rv /opt/virtual-office`, `setsebool -P httpd_can_network_connect 1` |
+| **Rogue Process CPU Spike** | Runaway background worker script looping infinitely and exhausting available CPU cycles. | Compute / Process | `top`, `ps aux --sort=-%cpu | head -10`, `lsof -p <PID>`, `strace -p <PID>`, `kill -15 <PID>` |
+| **Database Socket Collision** | Stale PID or abandoned socket file preventing database service daemon from launching. | Services / MySQL | `systemctl status mariadb`, `lsof /var/lib/mysql/mysql.sock`, `fuser -v /var/lib/mysql/mysql.sock`, `rm -f /var/lib/mysql/mysql.sock.lock` |
+| **Faulty Systemd Unit File** | Typo or missing dependency trigger in an enterprise service unit causing crash-loop status. | Systemd / Init | `systemctl status <unit>`, `journalctl -u <unit> -b -e --no-pager`, `systemd-analyze verify`, `systemctl daemon-reload` |
+| **Secondary IP Alias Drop** | Workstation IP unreachable over LAN because kernel network alias unbinds after adapter reset. | Networking / ARP | `ip -br addr show ens160`, `arping -I ens160 <IP>`, `ip route show`, `systemctl restart virtual-office-network.service` |
+
+---
+
 ## 📂 Project Structure
 
 ```
 /opt/virtual-office/
 ├── app.py                      # Flask Application entry point & API endpoints
 ├── virtual_office.wsgi         # Apache mod_wsgi gateway script
-├── setup_network.sh            # Network alias binding script
+├── LICENSE                     # MIT License
+├── README.md                   # Project documentation
 ├── engine/
 │   ├── __init__.py
 │   ├── office.py               # Enterprise organization, agent specs & states
@@ -115,52 +142,73 @@ graph TD
 
 ---
 
-## 🚀 Quick Setup & Deployment
+## 🚀 Quick Setup & Deployment (RHEL / Rocky Linux)
 
-### Prerequisites
-* Rocky Linux 8/9, RHEL, CentOS Stream, or Fedora
-* Python 3.9+ with `pip`
-* Apache HTTP Server (`httpd`) and `python3-mod_wsgi`
+Follow these steps for an enterprise-ready deployment on **Rocky Linux 8/9, RHEL, CentOS Stream, or Fedora**.
 
-### 1. Installation
+### 1. Repository Installation & Python Virtual Environment
 ```bash
 # Clone the repository
 git clone https://github.com/jacky1473/CyberApex.git /opt/virtual-office
 cd /opt/virtual-office
 
-# Install Python requirements
+# Create and activate Python Virtual Environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install required dependencies
+pip install --upgrade pip
 pip install flask
 ```
 
-### 2. Network Configuration
+### 2. Multi-IP Network Virtualization Service
 ```bash
-# Copy and enable the persistent IP binding service
+# Deploy persistent systemd secondary IP binding service
 cp deploy/systemd/virtual-office-network.service /etc/systemd/system/
 cp deploy/scripts/virtual-office-network.sh /usr/local/sbin/
 chmod +x /usr/local/sbin/virtual-office-network.sh
 
+# Reload systemd and start the service
 systemctl daemon-reload
 systemctl enable --now virtual-office-network.service
+
+# Verify all 15 IPs are bound
+ip -br addr show ens160
 ```
 
-### 3. Apache HTTPD Setup
+### 3. SELinux & Firewall Security Configuration
 ```bash
-# Copy Apache configuration
-cp deploy/apache/virtual-office.conf /etc/httpd/conf.d/
-
-# Set appropriate permissions
-chown -R farman:farman /opt/virtual-office
+# Configure standard Apache ownership and permissions
+chown -R apache:apache /opt/virtual-office
 chmod -R 755 /opt/virtual-office
 
-# Restart Apache
-systemctl restart httpd
+# Apply mandatory SELinux security context and network connect boolean
+chcon -R -t httpd_sys_rw_content_t /opt/virtual-office
+setsebool -P httpd_can_network_connect 1
+
+# Configure Firewalld to permit HTTP traffic
+firewall-cmd --permanent --add-service=http
+firewall-cmd --reload
 ```
 
-### 4. Access the Dashboard
-Open your browser and navigate to:
+### 4. Apache HTTPD & mod_wsgi Deployment
+```bash
+# Install Apache configuration
+cp deploy/apache/virtual-office.conf /etc/httpd/conf.d/
+
+# Enable and start Apache HTTPD
+systemctl daemon-reload
+systemctl enable --now httpd
+
+# Verify Apache service status
+systemctl status httpd --no-pager
+```
+
+### 5. Access the Web Dashboard
+Open your web browser and navigate to:
 ```
 http://localhost/
-# or from another machine in your LAN:
+# or across your corporate LAN:
 http://<server-ip>/
 ```
 
@@ -172,7 +220,7 @@ http://<server-ip>/
 | :--- | :--- | :--- | :--- |
 | `192.168.18.101` | **Aarav Sharma** | Chief Solutions Architect & Lead | Leadership |
 | `192.168.18.102` | **Priya Patel** | Scrum Master & Agile Lead | Project Mgmt |
-| `192.168.18.103` | **Vikram Malhotra**| Principal Network Architect | Network / NOC |
+| `192.168.18.103` | **Vikram Malhotra** | Principal Network Architect | Network / NOC |
 | `192.168.18.104` | **Sameer Khan** | NOC / Storage Engineer | Network / NOC |
 | `192.168.18.105` | **Rohan Gupta** | Senior DevOps & CI/CD Lead | DevOps |
 | `192.168.18.106` | **Kavita Desai** | Site Reliability Engineer (SRE) | DevOps |
@@ -188,5 +236,14 @@ http://<server-ip>/
 
 ---
 
+## 👨‍💻 Author & Architect
+
+**Farman Ahmed**  
+*Creator & Senior Linux System Administrator*  
+* GitHub: [@jacky1473](https://github.com/jacky1473)  
+* Project Repository: [jacky1473/CyberApex](https://github.com/jacky1473/CyberApex)
+
+---
+
 ## 📄 License
-This project is open-source and available under the [MIT License](LICENSE).
+This project is open-source and licensed under the [MIT License](LICENSE).
