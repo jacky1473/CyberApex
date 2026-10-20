@@ -174,6 +174,7 @@ def client_accept_delivery():
     return jsonify({"success": False, "error": "No project available to accept"}), 400
 
 @app.route('/api/network/toggle_lan', methods=['POST'])
+@app.route('/api/workstation/toggle_lan', methods=['POST'])
 def toggle_lan():
     data = request.json or {}
     emp_id = data.get("emp_id")
@@ -189,10 +190,10 @@ def toggle_lan():
     ip = emp.get("ip")
     emp["lan_connected"] = new_state
 
-    # Physical Linux OS IP Alias management on ens160
+    # Physical Linux OS IP Alias management isolated inside office-sandbox namespace (NEVER touches host ens160)
     if ip and ip.startswith("192.168.18."):
         if not new_state:
-            subprocess.run(f"sudo -n ip addr del {ip}/24 dev ens160 2>/dev/null || true", shell=True)
+            subprocess.run(f"sudo -n ip netns exec office-sandbox ip addr del {ip}/24 dev eth-office 2>/dev/null || true", shell=True)
             emp["status"] = "blocked"
             emp["task"] = "⚠️ BLOCKED: LAN Cable Disconnected from Server Room Core Switch"
             # Trigger real incident ticket logged by the affected bot
@@ -206,7 +207,7 @@ def toggle_lan():
                 text=f"🔌 **LAN CABLE UNPLUGGED:** Workstation `{ip}` ({emp['name']}) link DOWN! Port disconnected from Server Room Core Switch by Admin Farman."
             )
         else:
-            subprocess.run(f"sudo -n ip addr add {ip}/24 dev ens160 2>/dev/null || true", shell=True)
+            subprocess.run(f"sudo -n ip netns exec office-sandbox ip addr add {ip}/24 dev eth-office 2>/dev/null || true", shell=True)
             emp["status"] = "working"
             emp["task"] = "LAN Connected - 1000BASE-T link active with Core Switch"
             # Resolve network outage ticket and reward Farman XP
@@ -348,9 +349,21 @@ def vdi_exec():
     if not os.path.exists(ws_path):
         ws_path = "/opt/virtual-office"
 
+    # Sandbox Host Security Shield: Block commands that alter host physical interface ens160
+    cmd_lower = cmd.lower()
+    if "ens160" in cmd_lower:
+        return jsonify({
+            "success": False,
+            "hostname": emp_host,
+            "ip": emp_ip,
+            "cwd": ws_path,
+            "output": "[🛡️ SANDBOX SECURITY SHIELD]: Modifying host interface 'ens160' is blocked to protect your physical server. All workstation networking is isolated inside 'office-sandbox' namespace on interface 'eth-office'."
+        })
+
     try:
+        # Execute inside the isolated 'office-sandbox' network namespace
         proc = subprocess.run(
-            ['sudo', '-n', 'bash', '-c', cmd],
+            ['sudo', '-n', 'ip', 'netns', 'exec', 'office-sandbox', 'bash', '-c', cmd],
             cwd=ws_path,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -386,6 +399,14 @@ def admin_exec():
     # Handle clear directly
     if cmd == "clear":
         return jsonify({"success": True, "output": "", "clear_screen": True})
+
+    # Protection Shield: Prohibit destructive commands targeting ens160
+    if "nmcli" in cmd and "ens160" in cmd:
+        return jsonify({
+            "success": False,
+            "returncode": 1,
+            "output": "[🛡️ SANDBOX SHIELD]: Modifying host interface 'ens160' is blocked to safeguard physical server connection. Sandbox network interface is 'eth-office'."
+        })
 
     try:
         proc = subprocess.run(

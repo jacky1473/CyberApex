@@ -366,13 +366,7 @@ class IncidentEngine:
                 os.chmod(sock_file, 0o000)
 
             elif c_type == "LAN_CABLE_DISCONNECT":
-                emp = self.office.get(ticket.get("emp_id"))
-                if emp and emp.get("lan_connected", True):
-                    ip = emp.get("ip")
-                    res = subprocess.run(f"ip addr show ens160 | grep '{ip}'", shell=True, stdout=subprocess.PIPE)
-                    if res.returncode == 0:
-                        return True, f"Carrier detected! 1000BASE-T link active and IP {ip} bound on ens160."
-                return False, f"Physical cable is unplugged or IP {ticket.get('emp_ip')} is down on ens160. Plug cable back in [L]!"
+                pass
 
             elif c_type == "SYSTEMD_SERVICE":
                 subprocess.run("sudo -n systemctl stop office-db 2>/dev/null || true", shell=True)
@@ -479,12 +473,10 @@ class IncidentEngine:
                 emp = self.office.get(ticket.get("emp_id"))
                 if emp and emp.get("lan_connected", True):
                     ip = emp.get("ip")
-                    res = subprocess.run(f"ip addr show ens160 | grep '{ip}'", shell=True, stdout=subprocess.PIPE)
+                    res = subprocess.run(f"ip netns exec office-sandbox ip addr show eth-office | grep '{ip}'", shell=True, stdout=subprocess.PIPE)
                     if res.returncode == 0:
-                        return True, f"Carrier detected! 1000BASE-T link active and IP {ip} bound on ens160."
-                return False, f"Physical cable is unplugged or IP {ticket.get('emp_ip')} is down on ens160. Plug cable back in [L]!"
-
-            elif c_type == "SYSTEMD_SERVICE":
+                        return True, f"Carrier detected! Link active and IP {ip} bound in office-sandbox (Host ens160 safe)."
+                return False, f"Physical cable is unplugged or IP {ticket.get('emp_ip')} is down in office-sandbox. Plug cable back in [L]!"
                 res = subprocess.run("systemctl is-active office-db", shell=True, stdout=subprocess.PIPE)
                 status = res.stdout.decode().strip()
                 if status == "active":
@@ -661,7 +653,7 @@ class IncidentEngine:
                         e["lan_connected"] = True
                         ip = e.get("ip")
                         if ip:
-                            subprocess.run(f"sudo -n ip addr add {ip}/24 dev ens160 2>/dev/null || true", shell=True)
+                            subprocess.run(f"sudo -n ip netns exec office-sandbox ip addr add {ip}/24 dev eth-office 2>/dev/null || true", shell=True)
         except Exception as e:
             print(f"[AutoRemediate Error] {e}")
 
@@ -916,12 +908,12 @@ class IncidentEngine:
             "emp_hostname": emp["hostname"],
             "emp_dept": emp["dept"],
             "previous_task": prev_task,
-            "workstation_path": "/etc/sysconfig/network-scripts",
-            "target_file": "ifcfg-ens160",
-            "error_log": f"[KERNEL]: eth carrier lost on interface ens160 alias {emp['ip']}\n[NETWORK]: 100% packet loss to default gateway 192.168.18.2\n[DIAGNOSTIC]: Physical RJ45 patch cord disconnected from Central 10G Core Switch rack in Server Room.",
+            "workstation_path": "/etc/netns/office-sandbox",
+            "target_file": "eth-office",
+            "error_log": f"[KERNEL]: eth carrier lost on sandbox interface eth-office alias {emp['ip']}\n[NETWORK]: 100% packet loss to default gateway 192.168.18.2\n[DIAGNOSTIC]: Physical RJ45 patch cord disconnected from Central 10G Core Switch rack in Server Room.\n[ISOLATION]: Isolated inside 'office-sandbox' namespace; host ens160 protected.",
             "hint": f"Walk to {emp['name']}'s workstation desk (or Server Room Core Switch rack) in Walk Mode and press [L] to reconnect the LAN cable, or bind IP via terminal.",
-            "solution_cmd": f"sudo -n ip addr add {emp['ip']}/24 dev ens160",
-            "knowledge_pill": "Physical Layer (Layer 1 OSI) loss terminates all IP socket transport. Reconnecting the RJ45 cable restores PHY carrier detection and re-binds the Linux network alias.",
+            "solution_cmd": f"sudo -n ip netns exec office-sandbox ip addr add {emp['ip']}/24 dev eth-office",
+            "knowledge_pill": "Physical Layer (Layer 1 OSI) loss terminates all IP socket transport. Reconnecting the RJ45 cable restores PHY carrier detection and re-binds the Linux network alias inside the isolated sandbox namespace without touching host ens160.",
             "xp_reward": 120,
             "vdi_active": False,
             "admin_remarks": []

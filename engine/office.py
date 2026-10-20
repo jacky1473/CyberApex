@@ -123,7 +123,7 @@ CORE_CHARACTERS = [
         "specialty": "BGP, Firewalld, Subnetting & VoIP Trunks",
         "bio": "Network architect specialized in Rocky Linux networking, Asterisk SIP, and packet filtering.",
         "thought": "Gateway latency is 0.8ms, all clean",
-        "task": "Monitoring ens160 interface routes and firewalld zones"
+        "task": "Monitoring sandbox virtual network and firewalld zones"
     },
     {
         "id": "EMP-004",

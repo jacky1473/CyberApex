@@ -147,7 +147,7 @@ class ClientProjectManager:
             "network": [
                 ("Configure SIP Trunking & UDP 5060 Network Routing", 2),
                 ("Mount Remote NFS Recording Storage from 192.168.18.20", 2),
-                ("Audit Subnet 192.168.18.0/24 routes and DNS resolv.conf", 2)
+                ("Audit sandbox virtual subnet 192.168.18.0/24 and isolated DNS resolver", 2)
             ],
             "backend": [
                 ("Initialize MariaDB / PostgreSQL schema and connection pool", 3),

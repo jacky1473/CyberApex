@@ -7,7 +7,7 @@ import time
 import random
 
 AMBIENT_CHATTER = [
-    ("EMP-003", "Rohan Mehta", "Network & Security Lead", "network", "🧑‍💻", "Checking routing tables on ens160. Default gateway 192.168.18.2 responding with 0.8ms latency."),
+    ("EMP-003", "Rohan Mehta", "Network & Security Lead", "network", "🧑‍💻", "Checking routing tables on sandbox eth-office. Default gateway 192.168.18.2 responding with 0.8ms latency."),
     ("EMP-004", "Sameer Khan", "Storage & NOC Systems Engineer", "network", "🌐", "Auditing firewalld open ports. Port 80 and 5000 active, all rules green."),
     ("EMP-006", "Karan Verma", "Senior Python & API Dev", "backend", "⚙️", "API connection pool configured with 25 slots. Running stress test endpoint."),
     ("EMP-007", "Saanvi Mehta", "Database Administrator (DBA)", "backend", "🗄️", "MariaDB query execution plan cached. Slow query log is empty."),

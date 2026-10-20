@@ -411,6 +411,13 @@ body.cyber-theme {
     color: white;
 }
 
+.room-chip.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: white;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
 .status-legend {
     display: flex;
     gap: 8px;

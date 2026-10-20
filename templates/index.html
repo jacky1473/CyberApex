@@ -137,26 +137,24 @@
         <div class="floorplan-container card">
             <div class="floorplan-toolbar">
                 <div class="view-mode-selector">
-                    <button id="btn-mode-orbit" class="mode-chip active" onclick="Office3D.setMode('orbit')">🌐 Orbit Mode</button>
-                    <button id="btn-mode-walk" class="mode-chip" onclick="Office3D.setMode('walk')">🚶‍♂️ Walk Mode (Explore Office)</button>
+                    <span class="mode-chip active" style="cursor: default; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;">🚶‍♂️ RPG Walk Mode</span>
+                    <button id="btn-pov-toggle" class="mode-chip" onclick="Office3D.togglePerspective()">👁️ 3rd Person [V]</button>
+                    <button id="btn-respawn" class="mode-chip" onclick="Office3D.teleportTo('all')">🏠 Lobby [R]</button>
                 </div>
                 <div class="room-legend">
-                    <span class="legend-title">3D Camera:</span>
-                    <button class="room-chip" onclick="Office3D.focusRoom('all')">🌐 Whole Office</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_mgmt')">👔 Boardroom</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_noc')">🌐 NOC Room</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_admin')">🛡️ Linux Command Deck</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_cafe')">☕ Cyber Lounge</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_backend')">⚙️ Backend Bay</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_frontend')">💻 Frontend Studio</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_devops')">🚀 DevOps War Room</button>
-                    <button class="room-chip" onclick="Office3D.focusRoom('room_qa')">🧪 QA Lab</button>
+                    <span class="legend-title">⚡ Teleport Farman:</span>
+                    <button class="room-chip" onclick="Office3D.teleportTo('all')">🌐 Lobby</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_mgmt')">👔 Boardroom</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_noc')">🌐 NOC Room</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_admin')">🛡️ Linux Command Deck</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_cafe')">☕ Cyber Lounge</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_backend')">⚙️ Backend Bay</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_frontend')">💻 Frontend Studio</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_devops')">🚀 DevOps War Room</button>
+                    <button class="room-chip" onclick="Office3D.teleportTo('room_qa')">🧪 QA Lab</button>
                 </div>
                 <div class="status-legend">
-                    <span class="s-badge 🟢">🟢 Typing at Desk</span>
-                    <span class="s-badge 🔴">🔴 BLOCKED (Emergency Alert)</span>
-                    <span class="s-badge 🟡">🟡 In Meeting</span>
-                    <span class="s-badge ☕">☕ Espresso Break</span>
+                    <span class="s-badge" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; font-weight: 600;">🛡️ Sandbox Isolated: Host ens160 Protected</span>
                 </div>
             </div>
 
@@ -175,24 +173,24 @@
 
                 <!-- 3D Navigation Controls Guide Overlay -->
                 <div class="three-controls-guide">
-                    <span>🖱️ <strong>Left Click + Drag:</strong> Rotate 3D Camera</span>
-                    <span>🖱️ <strong>Right Click + Drag:</strong> Pan Floor</span>
-                    <span>📜 <strong>Scroll:</strong> Zoom In/Out</span>
-                    <span>👆 <strong>Click on Bot:</strong> Inspect AI Agent & Workstation</span>
+                    <span>🎮 <strong>W/A/S/D / Arrows:</strong> Move Farman</span>
+                    <span>🖱️ <strong>Click + Drag:</strong> Rotate Camera View</span>
+                    <span>📜 <strong>Scroll:</strong> Zoom Distance</span>
+                    <span>⚡ <strong>Shift:</strong> Sprint | <strong>[V]:</strong> 1st/3rd POV | <strong>[L]:</strong> LAN Cable</span>
                 </div>
 
                 <!-- Walk Mode Top HUD Overlay -->
-                <div id="walk-hud" class="walk-hud hidden">
+                <div id="walk-hud" class="walk-hud">
                     <div class="walk-hud-badge">
                         <span class="walk-icon">🚶‍♂️</span>
                         <div>
-                            <strong>WALK MODE ACTIVE</strong>
-                            <span class="walk-keys">W/A/S/D to Walk | SHIFT: Sprint | E: Interact | L: Plug/Unplug LAN</span>
+                            <strong>FARMAN RPG WALK MODE</strong>
+                            <span class="walk-keys">W/A/S/D to Walk | Shift: Sprint | Drag: Look Around | V: 1st/3rd POV | L: LAN Cable | E: Interact</span>
                         </div>
                     </div>
                     <div class="walk-hud-actions">
                         <button class="walk-view-toggle" id="btn-walk-pov" onclick="Office3D.togglePerspective()">👁️ 3rd Person View</button>
-                        <button class="walk-exit-btn" onclick="Office3D.setMode('orbit')">✕ Exit Walk Mode</button>
+                        <button class="walk-exit-btn" onclick="Office3D.teleportTo('all')" style="border-color: #38bdf8; color: #38bdf8;">🏠 Respawn at Lobby</button>
                     </div>
                 </div>
 
@@ -778,8 +776,7 @@ Type a bash command below or click a quick check button above.
     </div>
 
     <script src="/static/js/three.min.js"></script>
-    <script src="/static/js/OrbitControls.js"></script>
-    <script src="/static/js/office_3d.js?v=2.6"></script>
-    <script src="/static/js/office.js?v=2.6"></script>
+    <script src="/static/js/office_3d.js?v=3.0"></script>
+    <script src="/static/js/office.js?v=3.0"></script>
 </body>
 </html>
