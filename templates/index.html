@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberApex - Hands-On Linux SysAdmin & Virtual Office Game</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600;700;800&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    </noscript>
+</head>
+<body class="cyber-theme">
+    <!-- Top Cyberpunk Navbar -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="logo-badge">⚡</div>
+            <div>
+                <h1 class="brand-title">CYBERAPEX <span class="neon-blue">LINUX OPS</span></h1>
+                <p class="subtitle">Hands-On Linux SysAdmin Simulator &bull; 16 Specialist Engineers &bull; Real Rocky Linux OS Labs</p>
+            </div>
+        </div>
+
+        <!-- Farman's Player XP & Level HUD -->
+        <div class="player-hud">
+            <div class="hud-rank-pill">
+                <span class="rank-badge" id="player-badge">🔰</span>
+                <div>
+                    <span class="hud-tiny">SYSADMIN RANK:</span>
+                    <strong class="rank-title neon-cyan" id="player-rank">Junior SysAdmin</strong>
+                </div>
+            </div>
+
+            <!-- XP Progress -->
+            <div class="hud-xp-box">
+                <div class="xp-labels">
+                    <span class="hud-tiny">LEVEL <span id="player-level">1</span></span>
+                    <span class="hud-tiny" id="xp-numbers">150 / 300 XP</span>
+                </div>
+                <div class="xp-bar-wrap">
+                    <div class="xp-bar-fill" id="xp-bar-fill" style="width: 50%;"></div>
+                </div>
+            </div>
+
+            <!-- Coins Balance -->
+            <div class="coins-pill">
+                <span class="coin-icon">🪙</span>
+                <div>
+                    <span class="hud-tiny">CREDITS:</span>
+                    <strong class="coin-val" id="player-coins">200</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Hardware Metrics -->
+        <div class="header-metrics">
+            <div class="metric-item">
+                <span class="m-label">HOST IP</span>
+                <span class="m-val" id="server-ip">192.168.18.131</span>
+            </div>
+            <div class="metric-item">
+                <span class="m-label">RAM USAGE</span>
+                <span class="m-val highlight-green" id="server-ram">Loading...</span>
+            </div>
+            <div class="metric-item">
+                <span class="m-label">UPTIME</span>
+                <span class="m-val" id="server-uptime">99.8%</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Global Incident Alert Banner -->
+    <div id="incident-banner" class="incident-alert-banner hidden">
+        <div class="alert-content">
+            <span class="alert-icon">🚨</span>
+            <div class="alert-text">
+                <strong id="banner-title">CRITICAL INCIDENT ON ROCKY LINUX!</strong>
+                <span id="banner-desc">Workstation is blocked waiting for your real OS terminal troubleshooting.</span>
+            </div>
+        </div>
+        <button class="btn btn-danger btn-sm pulse-btn" onclick="switchTab('tab-lab')">Open SysAdmin Lab ➔</button>
+    </div>
+
+    <!-- Live Project Status HUD Bar -->
+    <section class="project-hud" id="project-hud-bar">
+        <div class="hud-item current-project-box">
+            <span class="hud-label">📋 ACTIVE PROJECT:</span>
+            <strong class="hud-value neon-white" id="hud-prj-title">No Active Project (Standby)</strong>
+        </div>
+        <div class="hud-item custodian-box">
+            <span class="hud-label">📍 IN-CHARGE / CABIN:</span>
+            <strong class="hud-value highlight-cyan" id="hud-custodian">Awaiting Client Order from Farman</strong>
+        </div>
+        <div class="hud-item eta-box">
+            <span class="hud-label">⏱️ DELIVERY ETA:</span>
+            <strong class="hud-value highlight-amber" id="hud-eta">--:--</strong>
+        </div>
+        <div class="hud-item progress-box">
+            <span class="hud-label">OVERALL PROGRESS:</span>
+            <div class="hud-progress-wrap">
+                <div class="hud-progress-bar" id="hud-progress-bar" style="width: 0%"></div>
+            </div>
+            <span class="hud-pct" id="hud-progress-pct">0%</span>
+        </div>
+    </section>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="tab-map" onclick="switchTab('tab-map')">
+            🎮 3D CyberOffice (Three.js WebGL & Bots)
+        </button>
+        <button class="tab-btn" data-tab="tab-agents" onclick="switchTab('tab-agents')">
+            🤖 AI Agent Rules & SOP Reports <span class="badge highlight-cyan" id="reports-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-lab" onclick="switchTab('tab-lab')">
+            🧪 Real Linux Hands-On Lab <span class="badge badge-danger" id="lab-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-upgrades" onclick="switchTab('tab-upgrades')">
+            🛒 Tech Upgrades Shop (Spend Coins)
+        </button>
+        <button class="tab-btn" data-tab="tab-client" onclick="switchTab('tab-client')">
+            👑 Client Project & Delivery
+        </button>
+        <button class="tab-btn" data-tab="tab-chat" onclick="switchTab('tab-chat')">
+            💬 CyberSlack Live Chat
+        </button>
+        <button class="tab-btn" data-tab="tab-terminal" onclick="switchTab('tab-terminal')">
+            💻 Master Linux Root Shell (All Commands Allowed)
+        </button>
+    </nav>
+
+    <!-- TAB 1: 3D CYBEROFFICE (Three.js WebGL & Bots) -->
+    <main class="tab-content active" id="tab-map">
+        <div class="floorplan-container card">
+            <div class="floorplan-toolbar">
+                <div class="room-legend">
+                    <span class="legend-title">3D Camera:</span>
+                    <button class="room-chip" onclick="Office3D.focusRoom('all')">🌐 Whole Office</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_mgmt')">👔 Boardroom</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_noc')">🌐 NOC Room</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_admin')">🛡️ Linux Command Deck</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_cafe')">☕ Cyber Lounge</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_backend')">⚙️ Backend Bay</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_frontend')">💻 Frontend Studio</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_devops')">🚀 DevOps War Room</button>
+                    <button class="room-chip" onclick="Office3D.focusRoom('room_qa')">🧪 QA Lab</button>
+                </div>
+                <div class="status-legend">
+                    <span class="s-badge 🟢">🟢 Typing at Desk</span>
+                    <span class="s-badge 🔴">🔴 BLOCKED (Emergency Alert)</span>
+                    <span class="s-badge 🟡">🟡 In Meeting</span>
+                    <span class="s-badge ☕">☕ Espresso Break</span>
+                </div>
+            </div>
+
+            <!-- WebGL 3D Container -->
+            <div id="webgl-wrapper" class="canvas-wrapper" style="height: 680px; position: relative;">
+                <div id="webgl-container" style="width: 100%; height: 100%;"></div>
+
+                <!-- 3D Navigation Controls Guide Overlay -->
+                <div class="three-controls-guide">
+                    <span>🖱️ <strong>Left Click + Drag:</strong> Rotate 3D Camera</span>
+                    <span>🖱️ <strong>Right Click + Drag:</strong> Pan Floor</span>
+                    <span>📜 <strong>Scroll:</strong> Zoom In/Out</span>
+                    <span>👆 <strong>Click on Bot:</strong> Inspect AI Agent & Workstation</span>
+                </div>
+
+                <!-- 3D Bot Inspector Drawer Card -->
+                <div id="agent-3d-card" class="agent-3d-card hidden">
+                    <div class="card-close" onclick="closeAgent3DCard()">✕</div>
+                    <div class="a3d-header">
+                        <span class="a3d-avatar" id="a3d-avatar">👨‍💻</span>
+                        <div>
+                            <h3 id="a3d-name">Employee Name</h3>
+                            <span class="a3d-role" id="a3d-role">Role</span>
+                        </div>
+                    </div>
+                    <div class="a3d-body">
+                        <div class="a3d-badge-row">
+                            <span class="badge" id="a3d-dept">Backend</span>
+                            <span class="badge highlight-cyan" id="a3d-ip">192.168.18.106</span>
+                            <span class="badge highlight-amber" id="a3d-status">Active</span>
+                        </div>
+                        <div class="a3d-section">
+                            <label>Workstation Hostname:</label>
+                            <code id="a3d-host">be-python.corp.local</code>
+                        </div>
+                        <div class="a3d-section">
+                            <label>Active AI Agent Task & SOP Step:</label>
+                            <div class="a3d-task" id="a3d-task">Task description</div>
+                            <div class="a3d-step highlight-cyan" id="a3d-step">Step 2: Technical Execution</div>
+                        </div>
+                        <div class="a3d-section">
+                            <label>Enterprise Rule Compliance:</label>
+                            <span class="a3d-rule">✅ Verified against RULE-01 to RULE-05</span>
+                        </div>
+                        <div class="a3d-actions">
+                            <button class="btn btn-primary btn-sm btn-block" onclick="launchAgentVDIFrom3D()">💻 Open Workstation Shell</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fallback 2D Canvas (hidden) -->
+                <canvas id="officeCanvas" width="1020" height="660" style="display: none;"></canvas>
+            </div>
+
+            <div class="floorplan-footer">
+                <span>⚡ <strong>3D WebGL Virtual Office RPG:</strong> 16 Autonomous AI Specialists with live typing, meeting, and blocked alarm states!</span>
+                <span id="canvas-fps">60 FPS WebGL</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- TAB 2: AI AGENT RULES & SOP REPORTS -->
+    <main class="tab-content" id="tab-agents">
+        <div class="dashboard-grid">
+            <!-- Left: Active Rules & Active Tasks -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>📜 Autonomous AI Agent Enterprise Rules</h2>
+                    <span class="sub-header">Strict operational constraints enforced on all 16 bots before any deliverable is signed off.</span>
+                </div>
+
+                <div class="rules-list" id="enterprise-rules-container">
+                    <div class="rule-card">
+                        <div class="rule-id">RULE-01</div>
+                        <div>
+                            <h4>Strict Zero-Loss & Non-Destructive Operations</h4>
+                            <p>Agents must verify system state and never execute unvalidated destructive commands without automated dry-run.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-id">RULE-02</div>
+                        <div>
+                            <h4>Least Privilege Security Enforcement</h4>
+                            <p>Daemons and IPC sockets must run under non-root service accounts with secure octal permissions (775/600).</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-id">RULE-03</div>
+                        <div>
+                            <h4>Automated Smoke & Regression Testing</h4>
+                            <p>Every implementation task must execute regression tests with 0 assertion failures before requesting merge.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-id">RULE-04</div>
+                        <div>
+                            <h4>Immediate Escalation on SysAdmin Blocker</h4>
+                            <p>If host resources or systemd units fail, pause task execution immediately and dispatch incident ticket to Linux Admin Farman.</p>
+                        </div>
+                    </div>
+                    <div class="rule-card">
+                        <div class="rule-id">RULE-05</div>
+                        <div>
+                            <h4>Mandatory Structured Progress Reporting</h4>
+                            <p>Post formal milestone completion report to General Manager Vikram Sharma and Client Farman upon signoff.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-header" style="margin-top: 1.5rem;">
+                    <h3>📋 4-Step Standard Operating Procedure (SOP)</h3>
+                </div>
+                <div class="sop-steps-grid">
+                    <div class="sop-step-box">
+                        <span class="step-num">Step 1</span>
+                        <strong>Spec & Rule Audit</strong>
+                        <span>Zero-loss & security verification</span>
+                    </div>
+                    <div class="sop-step-box">
+                        <span class="step-num">Step 2</span>
+                        <strong>Technical Execution</strong>
+                        <span>Code compile & config generation</span>
+                    </div>
+                    <div class="sop-step-box">
+                        <span class="step-num">Step 3</span>
+                        <strong>Regression Testing</strong>
+                        <span>Automated tests & peer signoff</span>
+                    </div>
+                    <div class="sop-step-box">
+                        <span class="step-num">Step 4</span>
+                        <strong>Formal Delivery Report</strong>
+                        <span>Artifact hashes & handoff filed</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Live Stream of Formal AI Agent Reports -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>📋 Official AI Agent Milestone Reports Stream</h2>
+                    <span class="sub-header">Live audit trail of signed technical reports submitted by agents to GM Vikram Sharma and Client Farman.</span>
+                </div>
+
+                <div id="agent-reports-feed" class="reports-feed">
+                    <div class="empty-state">
+                        <div class="empty-icon">🤖</div>
+                        <h3>Awaiting Agent Reports</h3>
+                        <p>When tasks are executed by specialists in the project pipeline, their formal signoff reports will stream here in real time.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- TAB 2: REAL LINUX HANDS-ON LAB (The Core Learning Game) -->
+    <main class="tab-content" id="tab-lab">
+        <div class="dashboard-grid">
+            <!-- Left: Active Real Incident Missions -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>🧪 Real Linux Incident Missions</h2>
+                    <span class="sub-header">These challenges create REAL files, processes, and permissions on Rocky Linux. Fix them using actual bash commands!</span>
+                </div>
+
+                <!-- Incident Selector Bar -->
+                <div class="sim-incident-bar">
+                    <span>⚡ Spawn Real OS Challenge:</span>
+                    <select id="sim-incident-type">
+                        <option value="DISK_BLOAT">1. Disk Quota Bloat (/var/log/virtual_office)</option>
+                        <option value="ROGUE_PORT">2. Rogue Worker Port 8888 Collision (pkill/fuser)</option>
+                        <option value="PERMISSION_SOCKET">3. Unix Socket 000 Permissions (chmod 775)</option>
+                        <option value="SYSTEMD_SERVICE">4. Dead Service office-db.service (systemctl)</option>
+                        <option value="SSH_KEY_PERMISSIONS">5. Insecure SSH Key 0664 (chmod 600)</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" onclick="triggerManualIncident()">Spawn Challenge in OS</button>
+                </div>
+
+                <div id="tickets-list" class="tickets-container">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Right: Real Troubleshooting & OS Verification Station -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>🔧 SysAdmin Hands-On Mission Deck</h2>
+                    <span class="sub-header">Troubleshoot inside the user's workstation, verify the real OS state, and earn XP!</span>
+                </div>
+
+                <div id="no-ticket-selected" class="empty-state">
+                    <div class="empty-icon">🛡️</div>
+                    <h3>No Incident Mission Selected</h3>
+                    <p>Select an active incident mission from the left panel to inspect the error log, launch the remote workstation terminal, and verify your real Linux fix!</p>
+                </div>
+
+                <div id="ticket-action-panel" class="hidden">
+                    <div class="ticket-header-box">
+                        <div class="t-badge-row">
+                            <span class="badge" id="act-ticket-id">#TICK-101</span>
+                            <span class="badge badge-danger" id="act-ticket-sev">CRITICAL</span>
+                            <span class="badge badge-dept" id="act-ticket-dept">Backend</span>
+                            <span class="badge highlight-amber" id="act-xp-reward">+150 XP</span>
+                        </div>
+                        <h3 id="act-ticket-title">Disk Space Full</h3>
+                        <p class="reporter-info">
+                            <strong>Affected Specialist:</strong> <span id="act-emp-name">Karan Verma</span> (<span id="act-emp-role">Senior Python Dev</span>)
+                        </p>
+                    </div>
+
+                    <!-- Workstation Network Metadata -->
+                    <div class="workstation-meta-bar">
+                        <div class="ws-meta-item">
+                            <span class="ws-label">WORKSTATION IP:</span>
+                            <strong class="ws-val highlight-cyan" id="act-emp-ip">192.168.18.106</strong>
+                        </div>
+                        <div class="ws-meta-item">
+                            <span class="ws-label">HOSTNAME:</span>
+                            <strong class="ws-val" id="act-emp-host">be-python.corp.local</strong>
+                        </div>
+                        <div class="ws-meta-item">
+                            <span class="ws-label">LAB PATH:</span>
+                            <strong class="ws-val highlight-amber" id="act-emp-path">/var/log/virtual_office</strong>
+                        </div>
+                    </div>
+
+                    <!-- Real OS Live Verification Status Bar -->
+                    <div class="os-verification-card">
+                        <div class="verif-status-row">
+                            <span class="verif-label">REAL OS CONDITION:</span>
+                            <strong class="verif-badge failing" id="verif-status-badge">🔴 UNRESOLVED ON ROCKY LINUX</strong>
+                        </div>
+                        <p class="verif-desc" id="verif-desc-text">The issue is actively present on the filesystem. Use the terminal below to apply the fix, then click "Verify Fix in OS".</p>
+                        <div class="verif-actions">
+                            <button class="btn btn-success" id="btn-verify-real-fix" onclick="verifyRealOsFix()">
+                                🔍 Verify Fix in Linux OS & Claim +150 XP!
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error Log Box -->
+                    <div class="console-box">
+                        <div class="console-header">📋 System Error Log Output</div>
+                        <pre id="act-error-log" class="error-log-code"></pre>
+                    </div>
+
+                    <!-- In-Browser Workstation Terminal -->
+                    <div class="vdi-station-box">
+                        <div class="vdi-header">
+                            <div class="vdi-title">
+                                <span>💻 Interactive Workstation Terminal</span>
+                                <span class="vdi-note">(Commands run directly on Rocky Linux)</span>
+                            </div>
+                            <div class="vdi-quick-bar">
+                                <button class="chip" onclick="runVdiCmd('df -h')">df -h</button>
+                                <button class="chip" onclick="runVdiQuickCheck('ls -la')">ls path</button>
+                                <button class="chip" onclick="runVdiCmd('ss -tlpn')">ss -tlpn</button>
+                                <button class="chip" onclick="runVdiQuickCheck('cat')">cat error file</button>
+                                <button class="chip" onclick="runVdiApplySolution()">⚡ Run Solution</button>
+                                <button class="chip" onclick="runVdiCmd('clear')">clear</button>
+                            </div>
+                        </div>
+
+                        <div class="vdi-terminal" id="vdi-terminal-output">
+[farman@dialer-server ~]# Ready. Type bash commands or use quick buttons above.
+                        </div>
+
+                        <form class="vdi-input-bar" onsubmit="handleVdiSubmit(event)">
+                            <span class="vdi-prompt" id="vdi-prompt-label">[root@rocky ~]# </span>
+                            <input type="text" id="vdi-input" placeholder="Type Linux command (e.g. truncate -s 0 ..., chmod 775 ..., fuser -k ...)..." autocomplete="off">
+                            <button type="submit" class="btn btn-primary btn-sm">Execute</button>
+                        </form>
+                    </div>
+
+                    <!-- SysAdmin Knowledge Pill (The Real Learning) -->
+                    <div class="knowledge-pill-card" id="knowledge-pill-box">
+                        <div class="kp-header" onclick="toggleKnowledgePill()">
+                            <span class="kp-icon">💡</span>
+                            <strong id="kp-title">SysAdmin Knowledge Pill: Why This Incident Matters in Production</strong>
+                            <span class="kp-toggle" id="kp-toggle-btn">▼</span>
+                        </div>
+                        <div class="kp-body" id="kp-body">
+                            <p id="kp-explanation" class="kp-text"></p>
+                            <label class="kp-sub">Useful Production Commands:</label>
+                            <div class="kp-commands" id="kp-pro-commands"></div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Remark & Bot Reply Section -->
+                    <div class="remark-section card">
+                        <div class="remark-header">
+                            <h4>💬 SysAdmin Remark & Bot Dialogue</h4>
+                            <span class="sub-header">Send advice/instruction to the engineer. The bot replies intelligently!</span>
+                        </div>
+
+                        <div class="remarks-thread" id="remarks-thread-box"></div>
+
+                        <form class="remark-form" onsubmit="submitAdminRemark(event)">
+                            <input type="text" id="admin-remark-input" placeholder="e.g. Make sure you configure logrotate so audit.log doesn't consume disk..." required>
+                            <button type="submit" class="btn btn-secondary btn-sm">💬 Send Remark</button>
+                        </form>
+                    </div>
+
+                    <div id="exec-feedback" class="exec-output hidden"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- TAB 3: OFFICE TECH UPGRADES SHOP (Spend Coins) -->
+    <main class="tab-content" id="tab-upgrades">
+        <div class="card">
+            <div class="card-header">
+                <h2>🛒 Office Tech Upgrades & Perks Shop</h2>
+                <span class="sub-header">Use credits earned by solving real Linux incidents to buy high-tech upgrades for your team!</span>
+            </div>
+
+            <div class="upgrades-grid">
+                <!-- Upgrade 1 -->
+                <div class="upgrade-card" id="card-perk-espresso">
+                    <div class="up-icon">☕</div>
+                    <h3>Barista Espresso Machine</h3>
+                    <p>Recharges team focus and reduces break durations. Boosts office productivity by <strong>+15%</strong>.</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 100 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('espresso')">Purchase Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 2 -->
+                <div class="upgrade-card" id="card-perk-monitors">
+                    <div class="up-icon">🖥️</div>
+                    <h3>Dual 4K Pro Developer Displays</h3>
+                    <p>Equips backend and frontend engineers with ultra-wide workspaces, preventing syntax and merge bugs.</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 150 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('monitors')">Purchase Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 3 -->
+                <div class="upgrade-card" id="card-perk-nvme">
+                    <div class="up-icon">🚀</div>
+                    <h3>NVMe High-Speed Array</h3>
+                    <p>Upgrades the DevOps build runner storage, reducing project delivery countdowns by <strong>40%</strong>.</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 250 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('nvme')">Purchase Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 4 -->
+                <div class="upgrade-card" id="card-perk-firewall_ai">
+                    <div class="up-icon">🛡️</div>
+                    <h3>Automated Firewall AI Sentinel</h3>
+                    <p>Deploys real-time network sensor that automatically highlights rogue ports and blocked packets for Admin.</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 300 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('firewall_ai')">Purchase Upgrade</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- TAB 4: CLIENT PROJECT & DELIVERY TRACKER -->
+    <main class="tab-content" id="tab-client">
+        <div class="dashboard-grid">
+            <section class="card client-card">
+                <div class="card-header">
+                    <h2>👑 Assign Client Project to Manager</h2>
+                    <span class="sub-header">You are the Client. Manager Vikram Sharma breaks down the project and assigns it to the 16 specialists.</span>
+                </div>
+
+                <div class="preset-section">
+                    <label>⚡ Quick Launch Project Templates:</label>
+                    <div class="preset-buttons" id="preset-container"></div>
+                </div>
+
+                <form id="project-form" onsubmit="submitClientProject(event)">
+                    <div class="form-group">
+                        <label for="project-title">Project Title:</label>
+                        <input type="text" id="project-title" required placeholder="e.g. Deploy Asterisk Call Center with NFS Audio Storage">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="project-desc">Client Requirements & Specifications:</label>
+                        <textarea id="project-desc" rows="3" placeholder="Detail any specific Linux services, networks, databases, or performance targets..."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Client Name:</label>
+                            <input type="text" id="client-name" value="Farman (Client)" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Recipient:</label>
+                            <input type="text" value="EMP-001 (Vikram Sharma - General Manager)" readonly>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        🚀 Send Project Order to Manager & Start Team
+                    </button>
+                </form>
+            </section>
+
+            <section class="card progress-card">
+                <div class="card-header">
+                    <h2>📊 Project Delivery Pipeline</h2>
+                    <span class="badge badge-status" id="project-status-badge">STANDBY</span>
+                </div>
+
+                <div id="no-project-view" class="empty-state">
+                    <div class="empty-icon">📁</div>
+                    <h3>No Active Project</h3>
+                    <p>Assign a project from the left panel to begin execution across all 16 specialists!</p>
+                </div>
+
+                <div id="active-project-view" class="project-details hidden">
+                    <div class="delivery-hero-box">
+                        <div>
+                            <span class="phase-indicator" id="current-phase-name">Phase 1: Architecture Planning</span>
+                            <h3 id="current-prj-title">Project Title</h3>
+                        </div>
+                        <div class="eta-pill" id="eta-pill-box">
+                            <span class="eta-small">DELIVERY ETA</span>
+                            <span class="eta-clock" id="delivery-clock">02:00</span>
+                        </div>
+                    </div>
+
+                    <div id="delivery-delay-alert" class="delay-alert hidden">
+                        <span>⚠️ <strong>DELIVERY PAUSED:</strong> Blocked by a Linux issue! Farman must resolve it in the lab to resume countdown.</span>
+                    </div>
+
+                    <div class="phase-stepper" id="phase-stepper-container"></div>
+
+                    <div class="custodian-card">
+                        <div class="custodian-icon">🏢</div>
+                        <div>
+                            <div class="c-label">CURRENT PROJECT CUSTODIAN & LOCATION:</div>
+                            <div class="c-name" id="custodian-detail">Vikram Sharma in Executive Boardroom</div>
+                        </div>
+                    </div>
+
+                    <h4>📋 Milestone Tasks Breakdown:</h4>
+                    <div class="tasks-table-wrap">
+                        <table class="tasks-table">
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Dept</th>
+                                    <th>Assignee</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tasks-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="delivery-package-card" class="delivery-card hidden">
+                        <div class="delivery-card-header">
+                            <span class="del-icon">🎁</span>
+                            <div>
+                                <h3>PROJECT DELIVERED TO CLIENT FARMAN!</h3>
+                                <p>Manager Vikram Sharma has completed the contract deliverables.</p>
+                            </div>
+                        </div>
+                        <div class="deliverables-list" id="deliverables-list-box"></div>
+                        <div class="signoff-action">
+                            <button class="btn btn-success" onclick="acceptClientDelivery()">
+                                ⭐ Accept & Sign Off Deliverables (5/5 Stars)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- TAB 5: CYBERSLACK LIVE CHAT -->
+    <main class="tab-content" id="tab-chat">
+        <div class="card chat-card">
+            <div class="card-header">
+                <h2>💬 #office-general (Virtual Workspace Slack)</h2>
+                <span class="sub-header">Live dialogue between Managers, Leads, Network Engineers, and Developers</span>
+            </div>
+
+            <div class="chat-stream" id="chat-stream-box"></div>
+        </div>
+    </main>
+
+    <!-- TAB 6: FULLSCREEN MASTER LINUX SHELL -->
+    <main class="tab-content" id="tab-terminal">
+        <div class="card terminal-card">
+            <div class="card-header">
+                <h2>💻 Master Linux Root Terminal</h2>
+                <span class="sub-header">Full bash console connected directly to your Rocky Linux 8 host</span>
+            </div>
+
+            <div class="quick-commands">
+                <span class="chip-label">Quick Checks:</span>
+                <button class="chip" onclick="runShellCmd('clear')">clear</button>
+                <button class="chip" onclick="runShellCmd('df -h')">df -h</button>
+                <button class="chip" onclick="runShellCmd('free -h')">free -h</button>
+                <button class="chip" onclick="runShellCmd('ss -tlpn')">ss -tlpn</button>
+                <button class="chip" onclick="runShellCmd('systemctl status office-db')">systemctl status office-db</button>
+                <button class="chip" onclick="runShellCmd('ip a')">ip a</button>
+                <button class="chip" onclick="runShellCmd('ls -la /var/log/virtual_office')">ls /var/log/virtual_office</button>
+            </div>
+
+            <div class="terminal-screen" id="terminal-output">
+CyberApex Master Linux Root Terminal [Rocky Linux 8.10 / Kernel 4.18.0]
+Type a bash command below or click a quick check button above.
+            </div>
+
+            <form class="terminal-input-bar" onsubmit="handleShellSubmit(event)">
+                <span class="term-prompt">[root@rocky ~]# </span>
+                <input type="text" id="terminal-input" placeholder="Type Linux command..." autocomplete="off">
+                <button type="submit" class="btn btn-primary btn-sm">Execute</button>
+            </form>
+        </div>
+    </main>
+
+    <!-- Bot Detail Inspector Modal -->
+    <div id="bot-modal" class="modal-backdrop hidden" onclick="closeBotModal(event)">
+        <div class="modal-box card" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="m-user">
+                    <span class="m-avatar" id="modal-avatar">👨‍💻</span>
+                    <div>
+                        <h3 id="modal-name">Employee Name</h3>
+                        <span class="m-role" id="modal-role">Role</span>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeBotModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="m-field">
+                    <label>Workstation Cabin:</label>
+                    <span id="modal-room" class="highlight-cyan">Backend Bay</span>
+                </div>
+                <div class="m-field">
+                    <label>IP Address & Hostname:</label>
+                    <span id="modal-network" class="m-code">192.168.18.106 (ws-backend.corp.local)</span>
+                </div>
+                <div class="m-field">
+                    <label>Technical Specialty:</label>
+                    <span id="modal-specialty">Python APIs & Microservices</span>
+                </div>
+                <div class="m-field">
+                    <label>Engineer Bio:</label>
+                    <span id="modal-bio" class="m-quote">Bio</span>
+                </div>
+                <div class="m-field">
+                    <label>Active Task:</label>
+                    <div id="modal-task" class="m-code">Task name</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/three.min.js"></script>
+    <script src="/static/js/OrbitControls.js"></script>
+    <script src="/static/js/office_3d.js"></script>
+    <script src="/static/js/office.js"></script>
+</body>
+</html>

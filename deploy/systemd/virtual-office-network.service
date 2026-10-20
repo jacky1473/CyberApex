@@ -1,0 +1,12 @@
+[Unit]
+Description=CyberApex Virtual Office Bot IPs Binding
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/virtual-office-network.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
