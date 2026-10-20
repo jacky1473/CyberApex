@@ -2,6 +2,9 @@
  * CyberApex 3D Virtual Office Engine - Three.js WebGL Implementation
  * Renders 16 AI Agent Specialists across 8 3D Cabins with dynamic animations,
  * interactive raycasting, workstation monitors, server racks, and alarm beacons.
+ * 
+ * Features decoupled smooth OrbitControls for silky-smooth 360° rotation,
+ * unrestricted zoom in/out, and smart auto-transition interrupts.
  */
 
 window.Office3D = (function() {
@@ -16,9 +19,12 @@ window.Office3D = (function() {
     let selectionRing = null;
     let isInitialized = false;
 
-    // Camera animation target
-    let targetCamPos = new THREE.Vector3(0, 48, 62);
+    // Camera animation target & state
+    let targetCamPos = new THREE.Vector3(0, 52, 65);
     let targetLookAt = new THREE.Vector3(0, 0, 0);
+    let isTransitioning = false; // Decoupled: only true during active fly-to animations
+    let isPointerDragging = false;
+    let pointerDownPos = new THREE.Vector2();
 
     // 8 Room Definitions (3D World Coordinates)
     const ROOM_DEFS = {
@@ -78,17 +84,31 @@ window.Office3D = (function() {
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.domElement.style.touchAction = 'none'; // Smooth touch control on laptops & mobile
         container.appendChild(renderer.domElement);
 
-        // 4. Controls
+        // 4. Orbit Controls (Fine-tuned for responsive rotation & zoom)
         if (THREE.OrbitControls) {
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.dampingFactor = 0.08;
-            controls.maxPolarAngle = Math.PI / 2.15; // Don't go below floor
-            controls.minDistance = 12;
-            controls.maxDistance = 120;
+            controls.dampingFactor = 0.06;
+            controls.rotateSpeed = 0.9;
+            controls.zoomSpeed = 1.35;
+            controls.panSpeed = 0.85;
+            controls.screenSpacePanning = true;
+            controls.enableRotate = true;
+            controls.enableZoom = true;
+            controls.enablePan = true;
+            controls.maxPolarAngle = Math.PI / 2.05; // Don't flip below floor
+            controls.minPolarAngle = 0.05;          // Don't flip upside down
+            controls.minDistance = 6;               // Allow extreme close-up
+            controls.maxDistance = 160;             // Allow wide overview
             controls.target.copy(targetLookAt);
+
+            // Cancel any automatic camera animation instantly whenever the user interacts
+            controls.addEventListener('start', () => {
+                isTransitioning = false;
+            });
         }
 
         // 5. Lighting
@@ -101,26 +121,48 @@ window.Office3D = (function() {
         // 7. Interactive Selection Ring
         buildSelectionRing();
 
-        // 8. Event Listeners
+        // 8. Event Listeners for Raycasting & Drag-Safe Clicking
         window.addEventListener('resize', onWindowResize);
-        container.addEventListener('mousemove', onMouseMove);
-        container.addEventListener('click', onClick);
+        
+        renderer.domElement.addEventListener('pointermove', onMouseMove);
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            pointerDownPos.set(e.clientX, e.clientY);
+            isPointerDragging = false;
+        });
+
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            if (dist > 6) {
+                isPointerDragging = true;
+            }
+        });
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            // Only trigger bot focus if pointer did NOT drag
+            if (dist < 6 && !isPointerDragging) {
+                if (hoveredBotId) {
+                    focusBot(hoveredBotId);
+                }
+            }
+        });
+
+        // 9. Keyboard Shortcuts for 3D Navigation
+        window.addEventListener('keydown', onKeyDown);
 
         isInitialized = true;
         animate();
     }
 
     function setupLighting() {
-        // Ambient soft fill
         const ambLight = new THREE.AmbientLight(0x64748b, 0.95);
         scene.add(ambLight);
 
-        // Directional overhead main light
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
         dirLight.position.set(30, 60, 40);
         scene.add(dirLight);
 
-        // Accent Point Lights in Cabins for Cyber Glow
         for (const [key, r] of Object.entries(ROOM_DEFS)) {
             const pLight = new THREE.PointLight(r.color, 1.1, 22);
             pLight.position.set(r.x, 6, r.z);
@@ -129,7 +171,6 @@ window.Office3D = (function() {
     }
 
     function buildFloor() {
-        // Main dark reflective platform
         const floorGeo = new THREE.PlaneGeometry(100, 80);
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0x0f172a,
@@ -141,7 +182,6 @@ window.Office3D = (function() {
         floor.position.y = -0.05;
         scene.add(floor);
 
-        // Neon Cyber Grid
         const grid = new THREE.GridHelper(100, 40, 0x06b6d4, 0x1e293b);
         grid.position.y = 0.01;
         scene.add(grid);
@@ -152,7 +192,6 @@ window.Office3D = (function() {
             const roomGroup = new THREE.Group();
             roomGroup.position.set(r.x, 0, r.z);
 
-            // Floor Tile for Cabin
             const tileGeo = new THREE.PlaneGeometry(r.w - 1, r.d - 1);
             const tileMat = new THREE.MeshStandardMaterial({
                 color: 0x131d33,
@@ -164,7 +203,6 @@ window.Office3D = (function() {
             tile.position.y = 0.02;
             roomGroup.add(tile);
 
-            // Glowing Boundary Trim
             const edgesGeo = new THREE.EdgesGeometry(tileGeo);
             const edgesMat = new THREE.LineBasicMaterial({ color: r.color, linewidth: 2 });
             const border = new THREE.LineSegments(edgesGeo, edgesMat);
@@ -172,7 +210,6 @@ window.Office3D = (function() {
             border.position.y = 0.04;
             roomGroup.add(border);
 
-            // Semi-Transparent Low Glass Walls (High-Performance standard material)
             const glassMat = new THREE.MeshStandardMaterial({
                 color: r.color,
                 transparent: true,
@@ -183,30 +220,25 @@ window.Office3D = (function() {
             const wallH = 2.4;
             const wallThick = 0.2;
 
-            // Back Wall
             const backWallGeo = new THREE.BoxGeometry(r.w - 1, wallH, wallThick);
             const backWall = new THREE.Mesh(backWallGeo, glassMat);
             backWall.position.set(0, wallH / 2, -(r.d - 1) / 2);
             roomGroup.add(backWall);
 
-            // Left Wall
             const sideWallGeo = new THREE.BoxGeometry(wallThick, wallH, r.d - 1);
             const leftWall = new THREE.Mesh(sideWallGeo, glassMat);
             leftWall.position.set(-(r.w - 1) / 2, wallH / 2, 0);
             roomGroup.add(leftWall);
 
-            // Right Wall
             const rightWall = new THREE.Mesh(sideWallGeo, glassMat);
             rightWall.position.set((r.w - 1) / 2, wallH / 2, 0);
             roomGroup.add(rightWall);
 
-            // 3D Floating Room Title Banner (Billboard Sprite)
             const titleSprite = createTextSprite(`${r.icon} ${r.name}`, r.color);
             titleSprite.position.set(0, 5.2, -(r.d - 1) / 2);
             titleSprite.scale.set(7.5, 2.0, 1);
             roomGroup.add(titleSprite);
 
-            // Specific Room Props
             if (roomId === "room_mgmt") {
                 buildBoardroomTable(roomGroup);
             } else if (roomId === "room_noc" || roomId === "room_admin") {
@@ -220,7 +252,6 @@ window.Office3D = (function() {
     }
 
     function buildBoardroomTable(group) {
-        // Oval / Rounded Conference Table
         const tableGeo = new THREE.CylinderGeometry(5.0, 5.0, 0.4, 24);
         tableGeo.scale(1.4, 1.0, 0.8);
         const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.4 });
@@ -230,7 +261,6 @@ window.Office3D = (function() {
         table.receiveShadow = true;
         group.add(table);
 
-        // Center holographic presentation core
         const coreGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.1, 16);
         const coreMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
         const core = new THREE.Mesh(coreGeo, coreMat);
@@ -248,7 +278,6 @@ window.Office3D = (function() {
             rack.castShadow = true;
             group.add(rack);
 
-            // Blinking LED dots
             for (let row = 0; row < 5; row++) {
                 for (let col = 0; col < 3; col++) {
                     const ledGeo = new THREE.BoxGeometry(0.12, 0.08, 0.05);
@@ -267,7 +296,6 @@ window.Office3D = (function() {
     }
 
     function buildCafeBar(group) {
-        // Coffee Bar Counter
         const barGeo = new THREE.BoxGeometry(10, 1.4, 2.2);
         const barMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.3 });
         const bar = new THREE.Mesh(barGeo, barMat);
@@ -275,7 +303,6 @@ window.Office3D = (function() {
         bar.castShadow = true;
         group.add(bar);
 
-        // Espresso Machine
         const machGeo = new THREE.BoxGeometry(2.2, 1.6, 1.4);
         const machMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.2 });
         const mach = new THREE.Mesh(machGeo, machMat);
@@ -298,7 +325,6 @@ window.Office3D = (function() {
         scene.add(selectionRing);
     }
 
-    // Create 3D Bot Character & Workstation
     function createBotMesh(emp) {
         const botGroup = new THREE.Group();
         botGroup.userData = { empId: emp.id, empData: emp };
@@ -314,7 +340,6 @@ window.Office3D = (function() {
         desk.receiveShadow = true;
         botGroup.add(desk);
 
-        // Desk Legs
         const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.0, 8);
         const legMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
         const legOffsets = [[-1.2, -0.6], [1.2, -0.6], [-1.2, 0.6], [1.2, 0.6]];
@@ -336,26 +361,23 @@ window.Office3D = (function() {
         monStem.position.set(0, 1.28, -0.35);
         botGroup.add(monStem);
 
-        // Screen bezel
         const scrBezelGeo = new THREE.BoxGeometry(1.6, 0.95, 0.08);
         const scrBezel = new THREE.Mesh(scrBezelGeo, new THREE.MeshStandardMaterial({ color: 0x0f172a }));
         scrBezel.position.set(0, 1.7, -0.35);
         botGroup.add(scrBezel);
 
-        // Glowing Screen Face
         const scrFaceGeo = new THREE.PlaneGeometry(1.5, 0.85);
         const scrFaceMat = new THREE.MeshBasicMaterial({ color: deptColor });
         const scrFace = new THREE.Mesh(scrFaceGeo, scrFaceMat);
         scrFace.position.set(0, 1.7, -0.30);
         botGroup.add(scrFace);
 
-        // Keyboard & Mouse
         const kbGeo = new THREE.BoxGeometry(0.9, 0.03, 0.35);
         const kb = new THREE.Mesh(kbGeo, new THREE.MeshStandardMaterial({ color: 0x090d16 }));
         kb.position.set(0, 1.08, 0.2);
         botGroup.add(kb);
 
-        // 3. Ergonomic Chair
+        // 3. Chair
         const chairSeatGeo = new THREE.BoxGeometry(1.1, 0.12, 1.1);
         const chairMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.6 });
         const chairSeat = new THREE.Mesh(chairSeatGeo, chairMat);
@@ -364,7 +386,7 @@ window.Office3D = (function() {
         botGroup.add(chairSeat);
 
         const chairBackGeo = new THREE.BoxGeometry(1.1, 1.2, 0.12);
-        const chairBack = new THREE.Mesh(chairBackGeo, chairMat);
+        const chairBack = new THREE.Mesh(chairBackBackGeo = chairBackGeo, chairMat);
         chairBack.position.set(0, 1.35, 1.25);
         chairBack.castShadow = true;
         botGroup.add(chairBack);
@@ -373,7 +395,6 @@ window.Office3D = (function() {
         const charGroup = new THREE.Group();
         charGroup.position.set(0, 0.8, 0.7);
 
-        // Torso
         const torsoGeo = new THREE.BoxGeometry(0.85, 1.1, 0.55);
         const torsoMat = new THREE.MeshStandardMaterial({
             color: deptColor,
@@ -385,7 +406,6 @@ window.Office3D = (function() {
         torso.castShadow = true;
         charGroup.add(torso);
 
-        // Head
         const headGeo = new THREE.SphereGeometry(0.48, 16, 16);
         const headMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.5 });
         const head = new THREE.Mesh(headGeo, headMat);
@@ -393,14 +413,12 @@ window.Office3D = (function() {
         head.castShadow = true;
         charGroup.add(head);
 
-        // Visor / Eyes (Glows Cyan)
         const visorGeo = new THREE.BoxGeometry(0.65, 0.18, 0.25);
         const visorMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
         const visor = new THREE.Mesh(visorGeo, visorMat);
         visor.position.set(0, 1.5, -0.38);
         charGroup.add(visor);
 
-        // Arms (For Typing Animation)
         const armGeo = new THREE.BoxGeometry(0.22, 0.7, 0.22);
         const armMat = new THREE.MeshStandardMaterial({ color: deptColor });
 
@@ -416,13 +434,11 @@ window.Office3D = (function() {
 
         botGroup.add(charGroup);
 
-        // 5. Overhead 3D Floating Name & Status Billboard
         const nameSprite = createTextSprite(`${emp.avatar || '🧑‍💻'} ${emp.name}`, deptColor);
         nameSprite.position.set(0, 3.8, 0);
         nameSprite.scale.set(6.0, 1.5, 1);
         botGroup.add(nameSprite);
 
-        // 6. Emergency Red Alarm Beacon (For BLOCKED status)
         const alarmGroup = new THREE.Group();
         alarmGroup.position.set(0, 4.8, 0);
         alarmGroup.visible = false;
@@ -438,7 +454,6 @@ window.Office3D = (function() {
 
         botGroup.add(alarmGroup);
 
-        // Keep references for dynamic updates
         return {
             group: botGroup,
             charGroup: charGroup,
@@ -453,26 +468,22 @@ window.Office3D = (function() {
         };
     }
 
-    // Helper: Create Text Sprite Canvas Texture
     function createTextSprite(text, colorHex) {
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 128;
         const ctx = canvas.getContext('2d');
 
-        // Glass pill background
         ctx.fillStyle = 'rgba(11, 15, 29, 0.85)';
         roundRect(ctx, 8, 8, 496, 112, 24);
         ctx.fill();
 
-        // Border
         const hexStr = typeof colorHex === 'number' ? '#' + colorHex.toString(16).padStart(6, '0') : colorHex;
         ctx.strokeStyle = hexStr;
         ctx.lineWidth = 6;
         roundRect(ctx, 8, 8, 496, 112, 24);
         ctx.stroke();
 
-        // Text
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 38px monospace';
         ctx.textAlign = 'center';
@@ -495,11 +506,8 @@ window.Office3D = (function() {
         ctx.closePath();
     }
 
-    // Calculate 3D position from 2D coordinates
     function map2Dto3D(emp, index) {
         const room = ROOM_DEFS[emp.room_id] || ROOM_DEFS.room_backend;
-        
-        // Desk slot relative offset inside room
         const col = index % 2;
         const row = Math.floor((index % 4) / 2);
         
@@ -513,7 +521,6 @@ window.Office3D = (function() {
         };
     }
 
-    // Update Bots from Server API State
     function update(employeesList) {
         if (!isInitialized || !employeesList) return;
 
@@ -530,11 +537,9 @@ window.Office3D = (function() {
 
             botEntry.data = emp;
 
-            // Handle BLOCKED status
             const isBlocked = emp.status === "blocked";
             botEntry.alarmGroup.visible = isBlocked;
 
-            // Update screen color if blocked
             if (isBlocked) {
                 botEntry.scrFace.material.color.setHex(0xff0033);
             } else {
@@ -549,6 +554,7 @@ window.Office3D = (function() {
         const preset = VIEW_PRESETS[roomId] || VIEW_PRESETS.all;
         targetCamPos.copy(preset.pos);
         targetLookAt.copy(preset.look);
+        isTransitioning = true;
     }
 
     // Focus on a specific 3D Bot
@@ -560,26 +566,83 @@ window.Office3D = (function() {
         const bPos = bot.group.position;
         targetCamPos.set(bPos.x, bPos.y + 6, bPos.z + 12);
         targetLookAt.set(bPos.x, bPos.y + 1.2, bPos.z);
+        isTransitioning = true;
 
-        // Position selection ring
         selectionRing.position.set(bPos.x, 0.08, bPos.z);
         selectionRing.visible = true;
 
-        // Trigger agent detail card
         if (window.show3DAgentCard) {
             window.show3DAgentCard(bot.data);
         }
     }
 
+    // Interactive Zoom and Rotation Helper Functions
+    function zoomIn() {
+        isTransitioning = false;
+        if (!camera) return;
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        camera.position.addScaledVector(dir, 8);
+        if (controls) controls.update();
+    }
+
+    function zoomOut() {
+        isTransitioning = false;
+        if (!camera) return;
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        camera.position.addScaledVector(dir, -8);
+        if (controls) controls.update();
+    }
+
+    function rotateCamera(angleRad) {
+        isTransitioning = false;
+        if (!camera || !controls) return;
+        const offset = camera.position.clone().sub(controls.target);
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleRad);
+        camera.position.copy(controls.target).add(offset);
+        controls.update();
+    }
+
+    function rotateLeft() {
+        rotateCamera(Math.PI / 12); // Rotate 15° Left
+    }
+
+    function rotateRight() {
+        rotateCamera(-Math.PI / 12); // Rotate 15° Right
+    }
+
+    function resetView() {
+        focusRoom('all');
+    }
+
+    // Keyboard Shortcuts for Navigation
+    function onKeyDown(e) {
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return; // Don't intercept typing
+
+        if (e.key === '+' || e.key === '=') {
+            zoomIn();
+        } else if (e.key === '-' || e.key === '_') {
+            zoomOut();
+        } else if (e.key === 'ArrowLeft') {
+            rotateLeft();
+        } else if (e.key === 'ArrowRight') {
+            rotateRight();
+        } else if (e.key === 'Home' || e.key === '0') {
+            resetView();
+        }
+    }
+
     // Mouse Move & Raycasting
     function onMouseMove(event) {
+        if (!renderer || !camera) return;
         const rect = renderer.domElement.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
         raycaster.setFromCamera(mouse, camera);
 
-        // Find intersected bot groups
         const interactables = [];
         botsMap.forEach(b => interactables.push(b.group));
 
@@ -599,13 +662,6 @@ window.Office3D = (function() {
         renderer.domElement.style.cursor = 'default';
     }
 
-    // Click on Bot in 3D Scene
-    function onClick(event) {
-        if (hoveredBotId) {
-            focusBot(hoveredBotId);
-        }
-    }
-
     function onWindowResize() {
         if (!container || !renderer || !camera) return;
         const width = container.clientWidth || 1020;
@@ -623,10 +679,22 @@ window.Office3D = (function() {
         const delta = clock.getDelta();
         const elapsedTime = clock.getElapsedTime();
 
-        // 1. Smooth Camera Interpolation (Lerp)
-        camera.position.lerp(targetCamPos, 0.05);
+        // 1. Smooth Camera Fly-To Transition (ONLY runs when a room/bot preset is triggered)
+        if (isTransitioning) {
+            camera.position.lerp(targetCamPos, 0.08);
+            if (controls) {
+                controls.target.lerp(targetLookAt, 0.08);
+            }
+            // Stop transition when camera arrives close enough to target
+            if (camera.position.distanceTo(targetCamPos) < 0.35 && (!controls || controls.target.distanceTo(targetLookAt) < 0.35)) {
+                camera.position.copy(targetCamPos);
+                if (controls) controls.target.copy(targetLookAt);
+                isTransitioning = false;
+            }
+        }
+
+        // Always update controls for smooth damping
         if (controls) {
-            controls.target.lerp(targetLookAt, 0.05);
             controls.update();
         }
 
@@ -635,16 +703,13 @@ window.Office3D = (function() {
             const isBlocked = b.data.status === "blocked";
             const isTyping = b.data.status === "working";
 
-            // Idle breathing bob
             b.charGroup.position.y = 0.8 + Math.sin(elapsedTime * 2.5 + b.animPhase) * 0.04;
 
-            // Typing arm movement
             if (isTyping && !isBlocked) {
                 b.leftArm.rotation.x = Math.PI / 4 + Math.sin(elapsedTime * 14 + b.animPhase) * 0.18;
                 b.rightArm.rotation.x = Math.PI / 4 + Math.cos(elapsedTime * 14 + b.animPhase) * 0.18;
             }
 
-            // Emergency alarm rotation & pulse
             if (isBlocked && b.alarmGroup.visible) {
                 b.alarmGroup.rotation.y += delta * 6;
                 const pulse = 1.0 + Math.sin(elapsedTime * 8) * 0.5;
@@ -670,6 +735,11 @@ window.Office3D = (function() {
         init: init,
         update: update,
         focusRoom: focusRoom,
-        focusBot: focusBot
+        focusBot: focusBot,
+        zoomIn: zoomIn,
+        zoomOut: zoomOut,
+        rotateLeft: rotateLeft,
+        rotateRight: rotateRight,
+        resetView: resetView
     };
 })();
