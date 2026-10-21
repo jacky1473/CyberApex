@@ -134,7 +134,7 @@ async function fetchState() {
         updatePerksUI();
 
         if (window.Office3D) {
-            window.Office3D.update(state.employees);
+            window.Office3D.update(state.employees, state.player_stats);
         }
         renderAgentReportsView();
 
@@ -842,6 +842,9 @@ async function buyPerk(perkId) {
         const data = await res.json();
         if (data.success) {
             playChime(true);
+            if (window.Office3D && window.Office3D.unlockPerk3D) {
+                window.Office3D.unlockPerk3D(perkId);
+            }
             alert(`🎉 UPGRADE UNLOCKED!\nPurchased: ${data.perk.name}\n${data.perk.desc}`);
             fetchState();
         } else {
@@ -1291,6 +1294,245 @@ function renderAgentReportsView() {
         </div>
     `).join('');
 }
+
+// -------------------------------------------------------------
+// Cisco Catalyst 9300 Packet Tracer Style Switch & Network Console
+// -------------------------------------------------------------
+let ciscoHistory = [];
+let ciscoHistoryIdx = -1;
+
+window.openCiscoSwitchModal = function() {
+    const modal = document.getElementById('cisco-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        window.refreshCiscoStatus();
+        const input = document.getElementById('cisco-cli-input');
+        if (input) {
+            setTimeout(() => input.focus(), 100);
+        }
+    }
+};
+
+window.closeCiscoSwitchModal = function(e) {
+    if (e && e.target && e.target !== document.getElementById('cisco-modal') && !e.target.classList.contains('btn-close')) {
+        return;
+    }
+    const modal = document.getElementById('cisco-modal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.refreshCiscoStatus = async function() {
+    try {
+        const res = await fetch('/api/cisco/status');
+        const data = await res.json();
+        if (data.success && data.switch) {
+            const sw = data.switch;
+            const uptimeEl = document.getElementById('cisco-uptime');
+            if (uptimeEl) uptimeEl.textContent = sw.uptime_str;
+            const activePortsEl = document.getElementById('cisco-active-ports');
+            if (activePortsEl) activePortsEl.textContent = `${sw.active_ports} / ${sw.total_ports} UP`;
+            const hostnameEl = document.getElementById('cisco-hostname');
+            if (hostnameEl) hostnameEl.textContent = sw.hostname;
+
+            const grid = document.getElementById('cisco-port-grid');
+            if (grid && sw.ports) {
+                grid.innerHTML = sw.ports.map(p => {
+                    const isUp = (p.status === 'up');
+                    const isUplink = (p.port_num === 16);
+                    return `
+                        <div class="cisco-port-card ${isUp ? 'port-up' : 'port-down'} ${isUplink ? 'port-uplink' : ''}"
+                             onclick="${isUplink ? "alert('Port 16 is Core 10G Gateway Trunk uplink - locked!')" : `window.toggleCiscoPort(${p.port_num})`}"
+                             title="${isUplink ? 'Core Gateway 10G SFP+ Uplink' : `Port ${p.port_num}: ${p.emp_name} (${p.ip}) - Click to toggle`}">
+                            <div class="cisco-port-top">
+                                <span class="port-num">${isUplink ? 'Te1/1/1' : `Gi1/0/${p.port_num}`}</span>
+                                <span class="port-led ${isUp ? 'led-green blinking' : 'led-red'}"></span>
+                            </div>
+                            <div class="cisco-port-jack">🔌 ${isUp ? 'LINK' : 'NO LINK'}</div>
+                            <div class="cisco-port-desc">${isUplink ? '10G GATEWAY' : p.emp_id}</div>
+                            <div class="cisco-port-sub">${isUplink ? 'VLAN 100' : `VLAN ${p.vlan}`}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to fetch Cisco switch status:', e);
+    }
+};
+
+window.toggleCiscoPort = async function(portNum) {
+    try {
+        const res = await fetch('/api/cisco/toggle_port', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ port_num: portNum })
+        });
+        const data = await res.json();
+        if (data.success) {
+            playChime(data.lan_connected);
+            await window.refreshCiscoStatus();
+            if (window.fetchState) window.fetchState();
+            const statusStr = data.lan_connected ? 'UP (Link active)' : 'DOWN (Cable unplugged)';
+            window.appendCiscoOutput(`%LINK-3-UPDOWN: Interface GigabitEthernet1/0/${portNum}, changed state to ${statusStr}`);
+        }
+    } catch (e) {
+        console.error('Failed to toggle Cisco port:', e);
+    }
+};
+
+window.executeCiscoCmd = async function(cmd) {
+    if (!cmd || !cmd.trim()) return;
+    const cleanCmd = cmd.trim();
+    if (cleanCmd.toLowerCase() === 'clear') {
+        window.clearCiscoConsole();
+        return;
+    }
+
+    window.appendCiscoOutput(`CyberApex-SW01# ${cleanCmd}`);
+
+    try {
+        const res = await fetch('/api/cisco/exec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: cleanCmd })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.appendCiscoOutput(data.output);
+            if (cleanCmd.includes('shutdown') || cleanCmd.includes('int') || cleanCmd.includes('shut')) {
+                await window.refreshCiscoStatus();
+                if (window.fetchState) window.fetchState();
+            }
+        }
+    } catch (e) {
+        window.appendCiscoOutput(`% Error executing command: ${e}`);
+    }
+};
+
+window.handleCiscoSubmit = function(e) {
+    e.preventDefault();
+    const input = document.getElementById('cisco-cli-input');
+    if (!input) return;
+    const cmd = input.value.trim();
+    if (cmd) {
+        ciscoHistory.push(cmd);
+        ciscoHistoryIdx = ciscoHistory.length;
+        input.value = '';
+        window.executeCiscoCmd(cmd);
+    }
+};
+
+window.clearCiscoConsole = function() {
+    const term = document.getElementById('cisco-terminal-output');
+    if (term) term.textContent = 'CyberApex-SW01#\n';
+};
+
+window.appendCiscoOutput = function(text) {
+    const term = document.getElementById('cisco-terminal-output');
+    if (term) {
+        term.textContent += '\n' + text;
+        term.scrollTop = term.scrollHeight;
+    }
+};
+
+// -------------------------------------------------------------
+// All-Hands Boardroom Meeting & Bindas Coffee Break Engine
+// -------------------------------------------------------------
+let isMeetingActive = false;
+let isBreakActive = false;
+
+window.callAllHandsMeeting = async function() {
+    try {
+        const endpoint = isMeetingActive ? '/api/office/end_meeting' : '/api/office/call_meeting';
+        const res = await fetch(endpoint, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            isMeetingActive = !isMeetingActive;
+            playChime(isMeetingActive);
+            const label = isMeetingActive ? '👔 End Boardroom Meeting [M]' : '👔 Call All-Hands Meeting [M]';
+            const btn1 = document.getElementById('btn-office-meeting');
+            if (btn1) {
+                btn1.textContent = label;
+                btn1.style.background = isMeetingActive ? 'rgba(245, 158, 11, 0.4)' : '';
+            }
+            const btn2 = document.getElementById('hud-btn-meeting');
+            if (btn2) btn2.textContent = isMeetingActive ? '👔 End Meeting' : '👔 Meeting [M]';
+
+            if (isMeetingActive && isBreakActive) {
+                isBreakActive = false;
+                const breakBtn = document.getElementById('btn-office-break');
+                if (breakBtn) {
+                    breakBtn.textContent = '☕ Chill Break (Bindas!) [B]';
+                    breakBtn.style.background = '';
+                }
+                const hudBreak = document.getElementById('hud-btn-break');
+                if (hudBreak) hudBreak.textContent = '☕ Break [B]';
+            }
+
+            if (window.fetchState) window.fetchState();
+        }
+    } catch (e) {
+        console.error('Meeting action failed:', e);
+    }
+};
+
+window.callCoffeeBreak = async function() {
+    try {
+        const endpoint = isBreakActive ? '/api/office/end_coffee_break' : '/api/office/coffee_break';
+        const res = await fetch(endpoint, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            isBreakActive = !isBreakActive;
+            playChime(isBreakActive);
+            const label = isBreakActive ? '☕ Resume Work [B]' : '☕ Chill Break (Bindas!) [B]';
+            const btn1 = document.getElementById('btn-office-break');
+            if (btn1) {
+                btn1.textContent = label;
+                btn1.style.background = isBreakActive ? 'rgba(251, 191, 36, 0.4)' : '';
+            }
+            const btn2 = document.getElementById('hud-btn-break');
+            if (btn2) btn2.textContent = isBreakActive ? '☕ Resume Work' : '☕ Break [B]';
+
+            if (isBreakActive && isMeetingActive) {
+                isMeetingActive = false;
+                const meetBtn = document.getElementById('btn-office-meeting');
+                if (meetBtn) {
+                    meetBtn.textContent = '👔 Call All-Hands Meeting [M]';
+                    meetBtn.style.background = '';
+                }
+                const hudMeet = document.getElementById('hud-btn-meeting');
+                if (hudMeet) hudMeet.textContent = '👔 Meeting [M]';
+            }
+
+            if (window.fetchState) window.fetchState();
+        }
+    } catch (e) {
+        console.error('Coffee break action failed:', e);
+    }
+};
+
+// Arrow key navigation for Cisco CLI terminal input
+document.addEventListener('keydown', (e) => {
+    const ciscoInput = document.getElementById('cisco-cli-input');
+    if (document.activeElement === ciscoInput) {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (ciscoHistoryIdx > 0) {
+                ciscoHistoryIdx--;
+                ciscoInput.value = ciscoHistory[ciscoHistoryIdx];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (ciscoHistoryIdx < ciscoHistory.length - 1) {
+                ciscoHistoryIdx++;
+                ciscoInput.value = ciscoHistory[ciscoHistoryIdx];
+            } else {
+                ciscoHistoryIdx = ciscoHistory.length;
+                ciscoInput.value = '';
+            }
+        }
+    }
+});
 
 // Initialization
 function startApp() {

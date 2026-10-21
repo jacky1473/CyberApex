@@ -334,11 +334,11 @@ class IncidentEngine:
         # Gamification State
         self.player_stats = {
             "name": "Farman",
-            "xp": 150,
-            "level": 1,
-            "rank": "Junior SysAdmin",
-            "badge": "🔰",
-            "coins": 200,
+            "xp": 350,
+            "level": 2,
+            "rank": "Systems Engineer",
+            "badge": "⚡",
+            "coins": 1500,
             "unlocked_perks": []
         }
 

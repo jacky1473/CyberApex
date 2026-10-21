@@ -140,6 +140,9 @@
                     <span class="mode-chip active" style="cursor: default; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;">🚶‍♂️ RPG Walk Mode</span>
                     <button id="btn-pov-toggle" class="mode-chip" onclick="Office3D.togglePerspective()">👁️ 3rd Person [V]</button>
                     <button id="btn-respawn" class="mode-chip" onclick="Office3D.teleportTo('all')">🏠 Lobby [R]</button>
+                    <button id="btn-office-meeting" class="mode-chip btn-action-glow" onclick="window.callAllHandsMeeting()">👔 Call All-Hands Meeting [M]</button>
+                    <button id="btn-office-break" class="mode-chip btn-action-glow" onclick="window.callCoffeeBreak()">☕ Chill Break (Bindas!) [B]</button>
+                    <button id="btn-office-cisco" class="mode-chip btn-action-glow" onclick="window.openCiscoSwitchModal()" style="background: rgba(6, 182, 212, 0.2); border-color: #06b6d4; color: #22d3ee;">🌐 Cisco 10G Switch CLI [C]</button>
                 </div>
                 <div class="room-legend">
                     <span class="legend-title">⚡ Teleport Farman:</span>
@@ -189,6 +192,9 @@
                         </div>
                     </div>
                     <div class="walk-hud-actions">
+                        <button class="walk-view-toggle" id="hud-btn-meeting" onclick="window.callAllHandsMeeting()">👔 Meeting [M]</button>
+                        <button class="walk-view-toggle" id="hud-btn-break" onclick="window.callCoffeeBreak()">☕ Break [B]</button>
+                        <button class="walk-view-toggle" id="hud-btn-cisco" onclick="window.openCiscoSwitchModal()" style="border-color: #06b6d4; color: #22d3ee;">🌐 Switch [C]</button>
                         <button class="walk-view-toggle" id="btn-walk-pov" onclick="Office3D.togglePerspective()">👁️ 3rd Person View</button>
                         <button class="walk-exit-btn" onclick="Office3D.teleportTo('all')" style="border-color: #38bdf8; color: #38bdf8;">🏠 Respawn at Lobby</button>
                     </div>
@@ -573,6 +579,28 @@
                         <button class="btn btn-primary btn-sm" onclick="buyPerk('firewall_ai')">Purchase Upgrade</button>
                     </div>
                 </div>
+
+                <!-- Upgrade 5 -->
+                <div class="upgrade-card" id="card-perk-trophy">
+                    <div class="up-icon">🏆</div>
+                    <h3>Linux Grandmaster Trophy</h3>
+                    <p>Golden Linux Penguin Trophy on Farman's Command Station. Inspires all 15 engineers with SysAdmin excellence.</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 120 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('trophy')">Purchase Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Upgrade 6 -->
+                <div class="upgrade-card" id="card-perk-arcade">
+                    <div class="up-icon">🕹️</div>
+                    <h3>Cyberpunk Retro Arcade Cabinet</h3>
+                    <p>Retro gaming arcade cabinet in Cafeteria for stress relief and recreation. Keeps the team chill and bindas!</p>
+                    <div class="up-footer">
+                        <span class="up-cost">🪙 180 Credits</span>
+                        <button class="btn btn-primary btn-sm" onclick="buyPerk('arcade')">Purchase Upgrade</button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -771,6 +799,83 @@ Type a bash command below or click a quick check button above.
                     <label>Active Task:</label>
                     <div id="modal-task" class="m-code">Task name</div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CISCO CATALYST 9300 PACKET TRACER STYLE SWITCH & NETWORK MODAL -->
+    <div id="cisco-modal" class="modal-backdrop hidden" onclick="closeCiscoSwitchModal(event)">
+        <div class="cisco-box card" onclick="event.stopPropagation()">
+            <!-- Switch Header / Branding -->
+            <div class="cisco-header">
+                <div class="cisco-brand">
+                    <span class="cisco-logo">🌐 CISCO</span>
+                    <div>
+                        <h3 id="cisco-hostname">CyberApex-SW01</h3>
+                        <span class="cisco-subtitle">Catalyst 9300-48UXM Enterprise 10G Multi-Gigabit Core Switch (Cisco IOS-XE Amsterdam 17.09)</span>
+                    </div>
+                </div>
+                <div class="cisco-header-controls">
+                    <button class="btn btn-secondary btn-sm" onclick="refreshCiscoStatus()">🔄 Refresh Status</button>
+                    <button class="btn-close" onclick="closeCiscoSwitchModal()">✕</button>
+                </div>
+            </div>
+
+            <!-- Switch Physical Faceplate & System LEDs -->
+            <div class="cisco-faceplate">
+                <div class="cisco-system-leds">
+                    <div class="sys-led"><span class="led-dot led-green blinking"></span> SYST</div>
+                    <div class="sys-led"><span class="led-dot led-green"></span> STAT</div>
+                    <div class="sys-led"><span class="led-dot led-green"></span> SPEED</div>
+                    <div class="sys-led"><span class="led-dot led-green"></span> DUPLX</div>
+                    <div class="sys-led"><span class="led-dot led-green"></span> RPS</div>
+                    <div class="sys-led"><span class="led-dot led-green"></span> STACK</div>
+                </div>
+                <div class="cisco-faceplate-divider"></div>
+                <div class="cisco-faceplate-info">
+                    <span>UPTIME: <strong id="cisco-uptime">Loading...</strong></span>
+                    <span>BASE MAC: <code>00:0c:29:bd:32:80</code></span>
+                    <span>PORTS ACTIVE: <strong id="cisco-active-ports">16 / 16 UP</strong></span>
+                </div>
+            </div>
+
+            <!-- Interactive Port Matrix (Click to toggle link/unplug cable) -->
+            <div class="cisco-ports-section">
+                <div class="ports-section-title">
+                    <span>🔌 16-PORT MULTI-GIGABIT MATRIX (Click any RJ45 port to Connect/Disconnect LAN Cable):</span>
+                </div>
+                <div class="cisco-port-grid" id="cisco-port-grid">
+                    <!-- Populated dynamically by office.js -->
+                </div>
+            </div>
+
+            <!-- Fast Command Shortcuts Bar -->
+            <div class="cisco-fast-cmds">
+                <span class="fast-cmd-label">⚡ Fast IOS Commands:</span>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show ip int brief')">show ip int brief</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show interfaces status')">show interfaces status</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show vlan brief')">show vlan brief</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show mac address-table')">show mac address-table</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show running-config')">show running-config</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('show version')">show version</button>
+                <button class="btn btn-outline btn-xs" onclick="executeCiscoCmd('ping 192.168.18.2')">ping 192.168.18.2</button>
+                <button class="btn btn-outline btn-xs" onclick="clearCiscoConsole()">clear</button>
+            </div>
+
+            <!-- Cisco IOS Monospace Terminal Screen -->
+            <div class="cisco-terminal-wrapper">
+                <div class="cisco-terminal-screen" id="cisco-terminal-output">CyberApex-SW01# show version
+Cisco IOS XE Software, Version 17.09.03a (Amsterdam)
+Cisco Catalyst 9300-48UXM 10G Multi-Gigabit Switch
+Processor board ID FJC2439A10X (Farman Enterprise Core)
+48 Gigabit Ethernet interfaces, 4 Ten Gigabit Ethernet interfaces
+System online. Type '?' or 'help' for available commands.
+CyberApex-SW01#</div>
+                <form class="cisco-cli-input-form" onsubmit="handleCiscoSubmit(event)">
+                    <span class="cisco-prompt" id="cisco-cli-prompt">CyberApex-SW01#</span>
+                    <input type="text" id="cisco-cli-input" class="cisco-cli-input" placeholder="Type Cisco IOS command (e.g. show ip int brief, shutdown, ping)..." autocomplete="off" spellcheck="false">
+                    <button type="submit" class="btn btn-primary btn-sm">Enter ↵</button>
+                </form>
             </div>
         </div>
     </div>

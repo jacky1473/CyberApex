@@ -424,6 +424,54 @@ class OfficeState:
             emp["y"] = emp["desk_y"]
             emp["thought"] = "BLOCKED! Incident raised for Chief Linux Admin Farman!"
 
+    def call_meeting(self, caller="Farman (Chief Linux Architect)", agenda="Architecture Review & Deliverables"):
+        for e in self.employees:
+            if e["id"] != "EMP-016":
+                e["status"] = "meeting"
+                e["task"] = f"In Boardroom: {agenda}"
+                e["thought"] = "Discussing deployment architecture with Vikram & Farman 👔"
+                e["x"] = 125 + (len(e["name"]) % 5 * 15) - 30
+                e["y"] = 95 + (len(e["id"]) % 4 * 12) - 20
+        return True
+
+    def end_meeting(self):
+        for e in self.employees:
+            if e["id"] != "EMP-016":
+                if e.get("lan_connected", True):
+                    e["status"] = "working"
+                    e["task"] = "Resuming active sprint deliverables"
+                    e["thought"] = "Applied meeting decisions. Back at desk! 🚀"
+                else:
+                    e["status"] = "blocked"
+                    e["task"] = "⚠️ BLOCKED: LAN Cable Disconnected from Core Switch"
+                e["x"] = e["desk_x"]
+                e["y"] = e["desk_y"]
+        return True
+
+    def call_coffee_break(self):
+        for e in self.employees:
+            if e["id"] != "EMP-016":
+                e["status"] = "coffee"
+                e["task"] = "Espresso Break in Cyber Lounge (Bindas Kaam!)"
+                e["thought"] = "Farman ki company hai, ek dam bindas chill karo! ☕"
+                e["x"] = 820 + (len(e["id"]) % 4 * 20)
+                e["y"] = 85 + (len(e["name"]) % 3 * 20)
+        return True
+
+    def end_coffee_break(self):
+        for e in self.employees:
+            if e["id"] != "EMP-016":
+                if e.get("lan_connected", True):
+                    e["status"] = "working"
+                    e["task"] = "Focus fully restored after espresso break"
+                    e["thought"] = "Recharged! Coding full speed!"
+                else:
+                    e["status"] = "blocked"
+                    e["task"] = "⚠️ BLOCKED: LAN Cable Disconnected from Core Switch"
+                e["x"] = e["desk_x"]
+                e["y"] = e["desk_y"]
+        return True
+
     def get_stats(self):
         total = len(self.employees)
         working = sum(1 for e in self.employees if e["status"] == "working")

@@ -18,6 +18,7 @@ from engine.office import OfficeState, DEPARTMENTS, ROOMS
 from engine.chat_engine import ChatEngine
 from engine.incident_engine import IncidentEngine, REAL_CHALLENGES, RANKS
 from engine.project_manager import ClientProjectManager, PRESET_PROJECTS, PHASES
+from engine.switch_engine import CiscoSwitchEngine
 
 app = Flask(__name__)
 
@@ -26,6 +27,7 @@ office_state = OfficeState()
 chat_engine = ChatEngine()
 incident_engine = IncidentEngine(office_state, chat_engine)
 project_manager = ClientProjectManager(office_state, chat_engine, incident_engine)
+switch_engine = CiscoSwitchEngine(office_state, incident_engine)
 
 def get_server_metrics():
     try:
@@ -117,7 +119,9 @@ def unlock_perk():
         "espresso": {"id": "espresso", "name": "☕ Barista Espresso Machine", "cost": 100, "desc": "Recharges team focus, boosting productivity by +15%"},
         "monitors": {"id": "monitors", "name": "🖥️ Dual 4K Developer Displays", "cost": 150, "desc": "Improves code review speed and prevents syntax errors"},
         "nvme": {"id": "nvme", "name": "🚀 NVMe High-Speed Array", "cost": 250, "desc": "Decreases project build times by 40%"},
-        "firewall_ai": {"id": "firewall_ai", "name": "🛡️ Automated Firewall AI Sentinel", "cost": 300, "desc": "Automatically suggests exact sysadmin commands for network tickets"}
+        "firewall_ai": {"id": "firewall_ai", "name": "🛡️ Automated Firewall AI Sentinel", "cost": 300, "desc": "Automatically suggests exact sysadmin commands for network tickets"},
+        "trophy": {"id": "trophy", "name": "🏆 Linux Grandmaster Trophy", "cost": 120, "desc": "Golden Linux Penguin Trophy on Farman's Command Station"},
+        "arcade": {"id": "arcade", "name": "🕹️ Cyberpunk Retro Arcade Machine", "cost": 180, "desc": "Retro gaming arcade cabinet in Cafeteria for stress relief"}
     }
     perk = perks_catalog.get(perk_id)
     if not perk:
@@ -244,6 +248,92 @@ def get_lan_status():
                 "status": e.get("status", "idle")
             })
     return jsonify({"success": True, "stations": status_list})
+
+@app.route('/api/office/call_meeting', methods=['POST'])
+def call_meeting():
+    office_state.call_meeting()
+    chat_engine.add_message(
+        sender_id="EMP-001",
+        sender_name="Vikram Sharma",
+        role="General Manager",
+        dept="management",
+        avatar="👔",
+        text="👔 **BOARDROOM ALL-HANDS ARCHITECTURE REVIEW:** All 15 specialist engineers, please assemble in the Executive Boardroom! Admin Farman is reviewing delivery milestones."
+    )
+    return jsonify({"success": True, "meeting_active": True})
+
+@app.route('/api/office/end_meeting', methods=['POST'])
+def end_meeting():
+    office_state.end_meeting()
+    chat_engine.add_message(
+        sender_id="EMP-001",
+        sender_name="Vikram Sharma",
+        role="General Manager",
+        dept="management",
+        avatar="👔",
+        text="👔 **MEETING CONCLUDED:** Architecture review complete! All engineers return to your assigned workstations."
+    )
+    return jsonify({"success": True, "meeting_active": False})
+
+@app.route('/api/office/coffee_break', methods=['POST'])
+def call_coffee_break():
+    office_state.call_coffee_break()
+    chat_engine.add_message(
+        sender_id="ADMIN",
+        sender_name="Farman (Chief Linux Architect)",
+        role="Chief Linux Architect",
+        dept="admin",
+        avatar="👑",
+        text="☕ **TEAM BREAK DECLARED:** Farman: 'Ye Farman ki company hai, ek dam bindas kaam karne ka!' Espresso break for everyone in the Cyber Lounge!"
+    )
+    return jsonify({"success": True, "coffee_break_active": True})
+
+@app.route('/api/office/end_coffee_break', methods=['POST'])
+def end_coffee_break():
+    office_state.end_coffee_break()
+    chat_engine.add_message(
+        sender_id="ADMIN",
+        sender_name="Farman (Chief Linux Architect)",
+        role="Chief Linux Architect",
+        dept="admin",
+        avatar="👑",
+        text="☕ **BREAK CONCLUDED:** Team fully recharged with espresso! Resuming sprint deliverables!"
+    )
+    return jsonify({"success": True, "coffee_break_active": False})
+
+@app.route('/api/cisco/status')
+def cisco_status():
+    return jsonify({"success": True, "switch": switch_engine.get_switch_data()})
+
+@app.route('/api/cisco/exec', methods=['POST'])
+def cisco_exec():
+    data = request.json or {}
+    cmd = data.get("command", "").strip()
+    output = switch_engine.execute_cisco_cli(cmd)
+    return jsonify({"success": True, "output": output})
+
+@app.route('/api/cisco/toggle_port', methods=['POST'])
+def cisco_toggle_port():
+    data = request.json or {}
+    port_num = data.get("port_num", 1)
+    if 1 <= port_num <= 15:
+        emp_id = f"EMP-{port_num:03d}"
+        emp = office_state.get(emp_id)
+        if emp:
+            is_currently_up = emp.get("lan_connected", True)
+            target_state = not is_currently_up
+            emp["lan_connected"] = target_state
+            ip = emp.get("ip")
+            if target_state:
+                subprocess.run(f"sudo -n ip netns exec office-sandbox ip addr add {ip}/24 dev eth-office 2>/dev/null || true", shell=True)
+                emp["status"] = "working"
+                incident_engine.resolve_lan_disconnect_ticket(emp_id)
+            else:
+                subprocess.run(f"sudo -n ip netns exec office-sandbox ip addr del {ip}/24 dev eth-office 2>/dev/null || true", shell=True)
+                emp["status"] = "blocked"
+                incident_engine.trigger_lan_disconnect_ticket(emp_id)
+            return jsonify({"success": True, "port_num": port_num, "lan_connected": target_state})
+    return jsonify({"success": False, "error": "Invalid port number"}), 400
 
 @app.route('/api/tickets/resolve', methods=['POST'])
 def resolve_ticket():
